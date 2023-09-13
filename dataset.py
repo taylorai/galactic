@@ -259,7 +259,7 @@ class Docent():
         self.dataset = self.dataset.map(detect_)
 
     def get_embeddings(self, field: str, backend: str = "onnx"):
-        model_path = "/Users/ben/Desktop/gte/onnx/model_quantized.onnx"
+        model_path = "models/model_quantized.onnx"
         tokenizer_path = "Supabase/gte-small"
         max_length = 512
         model = EmbeddingModel(
