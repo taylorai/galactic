@@ -13,6 +13,8 @@ from transformers import AutoTokenizer
 import scrubadub
 import fasttext
 import ctranslate2
+import huggingface_hub
+import pathlib
 
 # set up logging
 import logging
@@ -22,7 +24,7 @@ logging.basicConfig(level=logging.INFO)
 def byte_len(x):
     return len(x.encode("utf-8"))
 
-class Docent():
+class GalacticDataset():
     def __init__(self, dataset: datasets.Dataset):
         super().__init__()
         self.dataset = dataset
@@ -41,7 +43,7 @@ class Docent():
         **kwargs
     ):
         ds = datasets.load_dataset(path, split=split, **kwargs)
-        return Docent(ds)
+        return GalacticDataset(ds)
     
     @classmethod
     def from_hugging_face_stream(
@@ -80,7 +82,7 @@ class Docent():
         if idx > len(samples):
             msg += f"Removed {idx - len(samples)} samples that were duplicated, too long, or too short. "
         logging.info(msg)
-        return Docent(datasets.Dataset.from_list(samples))
+        return GalacticDataset(datasets.Dataset.from_list(samples))
     
     @classmethod
     def from_disk(
@@ -89,7 +91,7 @@ class Docent():
         **kwargs
     ):
         ds = datasets.Dataset.load_from_disk(path, **kwargs)
-        return Docent(ds)
+        return GalacticDataset(ds)
     
     def __repr__(self):
         return pd.DataFrame(self.dataset.select(range(5))).__repr__()
@@ -246,7 +248,11 @@ class Docent():
         self.dataset = self.dataset.map(detect_)
 
     def detect_language(self, field: str):
-        model = fasttext.load_model("models/lid.176.ftz")
+        model_path = huggingface_hub.hf_hub_download(
+            repo_id="TaylorAI/galactic-models",
+            filename="lid.176.ftz"
+        )
+        model = fasttext.load_model(model_path)
         def detect_(sample):
             if field in sample:
                 if isinstance(sample[field], str):
@@ -258,7 +264,9 @@ class Docent():
         self.dataset = self.dataset.map(detect_)
 
     def calc_perplexity(self, field: str):
-        model = ctranslate2.Generator("models/p70")
+        repo_path = huggingface_hub.snapshot_download("TaylorAI/galactic-models", allow_patterns="p70/*")
+        model_path = pathlib.Path(repo_path) / "p70"
+        model = ctranslate2.Generator(str(model_path))
         tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m")
         def calc_(sample):
             if field in sample:
@@ -276,7 +284,7 @@ class Docent():
         self.dataset = self.dataset.map(calc_) 
 
     def get_embeddings(self, field: str, backend: str = "onnx"):
-        model_path = "models/model_quantized.onnx"
+        model_path = huggingface_hub.hf_hub_download("TaylorAI/galactic-models", filename="model_quantized.onnx")
         tokenizer_path = "Supabase/gte-small"
         max_length = 512
         model = EmbeddingModel(
