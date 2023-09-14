@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[project]
+name = "galactic"
+version="0.1.0"
+authors = [
+    {name = "Benjamin Anderson", email = "ben@trytaylor.ai"},
+]
+description = "Curate, annotate, and clean massive unstructured text datasets for machine learning and AI systems."
+readme = "README.md"
+requires-python = ">=3.7"
+keywords = []
+license = {text = "ELv2"}
+classifiers = []
+dependencies = [
+    "datasets",
+    "ctranslate2",
+    "onnxruntime",
+    "transformers",
+    "huggingface_hub",
+    "numpy",
+    "pandas",
+    "tqdm",
+    "pybloom_live",
+    "networkx",
+    "scikit-learn",
+    "scrubadub", 
+    "fasttext"
+]
