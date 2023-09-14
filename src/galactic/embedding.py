@@ -3,6 +3,7 @@ from transformers import AutoTokenizer
 import numpy as np
 import ctranslate2
 
+
 class EmbeddingModel:
     def __init__(self, model_path, tokenizer_path, model_type, max_length=512):
         self.model_path = model_path
@@ -19,9 +20,15 @@ class EmbeddingModel:
         tokenized = self.tokenizer(text, return_tensors="np")
 
         # pad to be a multiple of max_length
-        rounded_len = int(np.ceil(len(tokenized["input_ids"][0]) / self.max_length) * self.max_length)
+        rounded_len = int(
+            np.ceil(len(tokenized["input_ids"][0]) / self.max_length) * self.max_length
+        )
         for k in tokenized:
-            tokenized[k] = np.pad(tokenized[k], ((0, 0), (0, rounded_len - len(tokenized[k][0]))), constant_values=0)
+            tokenized[k] = np.pad(
+                tokenized[k],
+                ((0, 0), (0, rounded_len - len(tokenized[k][0]))),
+                constant_values=0,
+            )
 
         # reshape into batch with max length
         for k in tokenized:
@@ -33,16 +40,17 @@ class EmbeddingModel:
         outs = []
         for seq in range(len(input["input_ids"])):
             out = self.session.run(
-                None, {
-                    "input_ids": input["input_ids"][seq:seq+1],
-                    "attention_mask": input["attention_mask"][seq:seq+1],
-                    "token_type_ids": input["token_type_ids"][seq:seq+1]
-                }
+                None,
+                {
+                    "input_ids": input["input_ids"][seq : seq + 1],
+                    "attention_mask": input["attention_mask"][seq : seq + 1],
+                    "token_type_ids": input["token_type_ids"][seq : seq + 1],
+                },
             )[0]
             outs.append(out)
-        out = np.concatenate(outs, axis=0) # bsz, seq_len, hidden_size
+        out = np.concatenate(outs, axis=0)  # bsz, seq_len, hidden_size
         return out
-    
+
     def forward_ctranslate2(self, input):
         input_ids = input["input_ids"].tolist()
         out = self.session.forward_batch(input_ids).pooler_output
@@ -54,11 +62,11 @@ class EmbeddingModel:
             # print("onnx")
             out = self.forward_onnx(input)
             # print("shape", out.shape)
-            out = np.mean(out, axis=(0, 1)) # mean of seq and bsz
+            out = np.mean(out, axis=(0, 1))  # mean of seq and bsz
         elif self.model_type == "ctranslate2":
             # print("ct2")
             out = self.forward_ctranslate2(input)
-            out =  np.mean(out, axis=0) # mean just over bsz
+            out = np.mean(out, axis=0)  # mean just over bsz
         # normalize to unit vector
         return out / np.linalg.norm(out)
 

@@ -1,14 +1,19 @@
 # Galactic
-Cleaning and curation tools for massive unstructured text datasets
+Cleaning and curation tools for massive unstructured text datasets.
 
-## Getting Started
-1. Clone the repo: `git clone https://github.com/taylorai/docent.git`
-3. Create a new Jupyter notebook
-4. Install the dependencies: `!pip install -r requirements.txt`
-5. Import Docent: `from dataset import Docent`
-6. Load your dataset: `ds = Docent.from_disk("c4-with_embs")`
+To get started, install the package (`pip install galactic-ai`) and import it:
+```python
+from galactic import GalacticDataset
+```
 
-## Utilities
+## Loading Data
+Galactic can load data from a variety of formats.
+- CSV
+   - `ds = GalacticDataset.from_csv("path/to/file.csv")`
+- JSONL
+   - `ds = GalacticDataset.from_jsonl("path/to/file.jsonl")`
+- 
+
 ### Preprocessing
 - Trim whitespace
    - `ds.trim_whitespace(fields=["field1", "field2"])`

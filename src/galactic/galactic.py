@@ -18,113 +18,64 @@ import pathlib
 
 # set up logging
 import logging
+
 logging.basicConfig(level=logging.INFO)
 
-# helper: length in utf-8 bytes
-def byte_len(x):
-    return len(x.encode("utf-8"))
 
-class GalacticDataset():
+class GalacticDataset:
     def __init__(self, dataset: datasets.Dataset):
         super().__init__()
         self.dataset = dataset
-        # add unique increaing int __id field
-        self.dataset = self.dataset.map(
-            lambda x, i: {"__id": i},
-            with_indices=True,
-        )
+        # add unique increaing int __id field if it doesn't already exist
+        if "__id" not in self.dataset.column_names:
+            self.dataset = self.dataset.map(
+                lambda x, i: {"__id": i},
+                with_indices=True,
+            )
+        elif "__id" in self.dataset.column_names:
+            logging.info(
+                "Dataset already contains __id field. Checking for uniqueness..."
+            )
+            if len(self.dataset["__id"]) != len(set(self.dataset["__id"])):
+                raise ValueError("Dataset contains duplicate __id values.")
 
-
-    @classmethod
-    def from_hugging_face(
-        cls, 
-        path: str,
-        split: str,
-        **kwargs
-    ):
-        ds = datasets.load_dataset(path, split=split, **kwargs)
-        return GalacticDataset(ds)
-    
-    @classmethod
-    def from_hugging_face_stream(
-        cls,
-        path: str,
-        split: str,
-        dedup_fields: list[str] = None,
-        max_samples: int = 200000,
-        filter_min_lengths: dict[str, int] = None,
-        filter_max_lengths: dict[str, int] = None,
-        **kwargs
-    ):
-        handle = datasets.load_dataset(path, split=split, streaming=True, **kwargs)
-        bloom = pybloom_live.BloomFilter(capacity=max_samples, error_rate=0.001)
-        samples = []
-        progress = tqdm(total=max_samples, desc=f"Loading samples from {path}")
-        for idx, sample in enumerate(handle):
-            if filter_min_lengths is not None:
-                if any([byte_len(str(sample[k])) < filter_min_lengths[k] for k in filter_min_lengths]):
-                    continue
-            if filter_max_lengths is not None:
-                if any([byte_len(str(sample[k])) > filter_max_lengths[k] for k in filter_max_lengths]):
-                    continue
-
-            if dedup_fields is not None and len(dedup_fields) > 0:
-                key = json.dumps({k: sample[k] for k in dedup_fields})
-                if key in bloom:
-                    continue
-                bloom.add(key)
-            samples.append(sample)
-            progress.update(1)
-            if len(samples) >= max_samples:
-                break
-        progress.close()
-        msg = f"Loaded {len(samples)} samples from {path}. "
-        if idx > len(samples):
-            msg += f"Removed {idx - len(samples)} samples that were duplicated, too long, or too short. "
-        logging.info(msg)
-        return GalacticDataset(datasets.Dataset.from_list(samples))
-    
-    @classmethod
-    def from_disk(
-        cls,
-        path: str,
-        **kwargs
-    ):
-        ds = datasets.Dataset.load_from_disk(path, **kwargs)
-        return GalacticDataset(ds)
-    
     def __repr__(self):
         return pd.DataFrame(self.dataset.select(range(5))).__repr__()
-    
+
     def __str__(self):
         return self.__repr__()
-    
+
     def __len__(self):
         return len(self.dataset)
-    
+
     def __getitem__(self, idx):
         return self.dataset[idx]
-    
+
     def trim_whitespace(self, fields: Sequence[str]):
         """
         Trim Unicode-defined whitespace at the beginning and end of specified fields.
         Args:
             fields (List[str]): List of fields to trim.
         """
+
         def trim_(sample):
             for field in fields:
                 if field in sample:
                     sample[field] = sample[field].strip()
             return sample
+
         self.dataset = self.dataset.map(trim_)
         logging.info(f"Trimmed whitespace for fields: {fields}")
 
     def tag_string(self, fields: Sequence[str], values: Sequence[str], tag: str):
         # make sure the tag hasn't already been used
         if f"__tag__{tag}" in self.dataset.column_names:
-            logging.warning(f"Tag {tag} already exists. This will overwrite the existing tag.")
-        
+            logging.warning(
+                f"Tag {tag} already exists. This will overwrite the existing tag."
+            )
+
         regexp = re.compile("|".join(values))
+
         def tag_(sample):
             for field in fields:
                 if field in sample:
@@ -135,15 +86,21 @@ class GalacticDataset():
                         if regexp.search(str(sample[field])):
                             return {f"__tag__{tag}": True}
             return {f"__tag__{tag}": False}
+
         self.dataset = self.dataset.map(tag_)
-        logging.info(f"Tagged dataset based on provided string values in fields: {fields}")
-    
+        logging.info(
+            f"Tagged dataset based on provided string values in fields: {fields}"
+        )
+
     def tag_regex(self, fields: Sequence[str], regex: str, tag: str):
         # make sure the tag hasn't already been used
         if f"__tag__{tag}" in self.dataset.column_names:
-            logging.warning(f"Tag {tag} already exists. This will overwrite the existing tag.")
-        
+            logging.warning(
+                f"Tag {tag} already exists. This will overwrite the existing tag."
+            )
+
         regexp = re.compile(regex)
+
         def tag_(sample):
             for field in fields:
                 if field in sample:
@@ -154,6 +111,7 @@ class GalacticDataset():
                         if regexp.search(str(sample[field])):
                             return {f"__tag__{tag}": True}
             return {f"__tag__{tag}": False}
+
         self.dataset = self.dataset.map(tag_)
         logging.info(f"Tagged dataset based on provided regex in fields: {fields}")
 
@@ -178,9 +136,11 @@ class GalacticDataset():
                         if regexp.search(str(sample[field])):
                             return False
             return True
-        
+
         self.dataset = self.dataset.filter(filter_)
-        logging.info(f"Filtered dataset based on provided string values in fields: {fields}")
+        logging.info(
+            f"Filtered dataset based on provided string values in fields: {fields}"
+        )
 
     def filter_regex(self, fields: Sequence[str], regex: str):
         """
@@ -207,7 +167,7 @@ class GalacticDataset():
         self.dataset = self.dataset.filter(filter_)
         logging.info(f"Filtered dataset based on provided regex in fields: {fields}")
 
-    def count_tokens(self, fields: Sequence[str], tokenizer = None):
+    def count_tokens(self, fields: Sequence[str], tokenizer=None):
         """
         Count the number of tokens in the specified fields.
         Args:
@@ -224,7 +184,7 @@ class GalacticDataset():
             lambda x: {f"__token_count_{field}": count_fn(x[field]) for field in fields}
         )
         logging.info(f"Counted tokens in fields: {fields}")
-    
+
     def detect_pii(self, fields: Sequence[str]):
         """
         Detect personally identifiable information in the specified fields.
@@ -232,6 +192,7 @@ class GalacticDataset():
             fields (List[str]): List of fields to detect PII in.
             Currently only supports "email", "phone", and "credential".
         """
+
         def detect_(sample):
             filth = []
             for field in fields:
@@ -242,32 +203,48 @@ class GalacticDataset():
                         filth.extend(scrubadub.list_filth(str(sample[field])))
             filth_types = [f.detector_name for f in filth]
             return {
-                **{f"__pii__{f}": f in filth_types for f in ["email", "phone", "credential"]},
+                **{
+                    f"__pii__{f}": f in filth_types
+                    for f in ["email", "phone", "credential"]
+                },
                 "__pii__any": len(filth) > 0,
             }
+
         self.dataset = self.dataset.map(detect_)
 
     def detect_language(self, field: str):
         model_path = huggingface_hub.hf_hub_download(
-            repo_id="TaylorAI/galactic-models",
-            filename="lid.176.ftz"
+            repo_id="TaylorAI/galactic-models", filename="lid.176.ftz"
         )
         model = fasttext.load_model(model_path)
+
         def detect_(sample):
             if field in sample:
                 if isinstance(sample[field], str):
-                    return {"__language": model.predict(sample[field].replace("\n", " "))[0][0].split("__label__")[1]}
+                    return {
+                        "__language": model.predict(sample[field].replace("\n", " "))[
+                            0
+                        ][0].split("__label__")[1]
+                    }
                 else:
-                    return {"__language": model.predict(str(sample[field]))[0][0].split("__label__")[1]}
+                    return {
+                        "__language": model.predict(str(sample[field]))[0][0].split(
+                            "__label__"
+                        )[1]
+                    }
             else:
                 return {"__language": None}
+
         self.dataset = self.dataset.map(detect_)
 
     def calc_perplexity(self, field: str):
-        repo_path = huggingface_hub.snapshot_download("TaylorAI/galactic-models", allow_patterns="p70/*")
+        repo_path = huggingface_hub.snapshot_download(
+            "TaylorAI/galactic-models", allow_patterns="p70/*"
+        )
         model_path = pathlib.Path(repo_path) / "p70"
         model = ctranslate2.Generator(str(model_path))
         tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m")
+
         def calc_(sample):
             if field in sample:
                 if isinstance(sample[field], str):
@@ -279,42 +256,44 @@ class GalacticDataset():
                 else:
                     return {"__perplexity": None}
             else:
-                return {"__perplexity": None}  
+                return {"__perplexity": None}
 
-        self.dataset = self.dataset.map(calc_) 
+        self.dataset = self.dataset.map(calc_)
 
     def get_embeddings(self, field: str, backend: str = "onnx"):
-        model_path = huggingface_hub.hf_hub_download("TaylorAI/galactic-models", filename="model_quantized.onnx")
+        model_path = huggingface_hub.hf_hub_download(
+            "TaylorAI/galactic-models", filename="model_quantized.onnx"
+        )
         tokenizer_path = "Supabase/gte-small"
         max_length = 512
         model = EmbeddingModel(
             model_path=model_path,
             tokenizer_path=tokenizer_path,
             model_type="onnx",
-            max_length=max_length
+            max_length=max_length,
         )
         self.model = model
-        self.dataset = self.dataset.map(
-            lambda x: {f"__embedding": model(x[field])}
-        )
+        self.dataset = self.dataset.map(lambda x: {f"__embedding": model(x[field])})
 
         self.dataset.add_faiss_index(column="__embedding")
         logging.info(f"Created embeddings & FAISS index on field {field}")
 
     def get_nearest_neighbors(self, query: str, k: int = 5):
         if not hasattr(self, "model"):
-            raise ValueError("You must call get_embeddings() before calling get_nearest_neighbors()")
+            raise ValueError(
+                "You must call get_embeddings() before calling get_nearest_neighbors()"
+            )
         query_embedding = self.model.predict(query)
         results = self.dataset.get_nearest_examples("__embedding", query_embedding, k=k)
         return results
-    
-    def cluster(self, 
-            n_clusters: int, 
-            method: str = "kmeans",
-            batch_size: int = 1024, 
-            n_epochs: int = 5
-        ):
-        
+
+    def cluster(
+        self,
+        n_clusters: int,
+        method: str = "kmeans",
+        batch_size: int = 1024,
+        n_epochs: int = 5,
+    ):
         if method == "minibatch_kmeans":
             model = MiniBatchKMeans(n_clusters=n_clusters, batch_size=batch_size)
             for epoch in range(n_epochs):
@@ -332,16 +311,16 @@ class GalacticDataset():
             self.n_clusters = n_clusters
         else:
             raise ValueError(f"Unknown clustering method: {method}")
-        
+
         # add new column with cluster labels
         self.dataset = self.dataset.map(
             lambda x: {"__cluster": model.predict(x["__embedding"])},
             batched=True,
         )
-    
+
     def remove_cluster(self, cluster: int):
         self.dataset = self.dataset.filter(lambda x: x["__cluster"] != cluster)
-    
+
     def semdedup(self, threshold: float = 0.95):
         for cluster in tqdm(range(self.n_clusters), desc="Semantic deduplication"):
             cluster = self.dataset.filter(lambda x: x["__cluster"] == cluster)
@@ -363,14 +342,7 @@ class GalacticDataset():
                 closest_to_centroid = min(component, key=lambda x: centroid_sims[x])
                 component.remove(closest_to_centroid)
                 to_remove.update(component)
-            
 
     # finetune embeddings as in https://github.com/openai/openai-cookbook/blob/main/examples/Customizing_embeddings.ipynb
     def tune_embeddings(self):
         pass
-
-
-
-
-        
-    
