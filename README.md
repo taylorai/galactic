@@ -1,5 +1,5 @@
-# Taylor AI: Docent
-Data cleaning and curation for unstructured text
+# Galactic
+Cleaning and curation tools for massive unstructured text datasets
 
 ## Getting Started
 1. Clone the repo: `git clone https://github.com/taylorai/docent.git`
