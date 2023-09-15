@@ -12,22 +12,22 @@ from galactic import GalacticDataset
 
 Transforms are operations that modify the data in some way. They are used in the GalacticDataset class to preprocess the data before it is used for training or inference. Here are the available transforms:
 
-- Transform 1: This transform does...
-- Transform 2: This transform does...
+- Transform 1: This transform does... (specific details and example for the first transform found in src/galactic/transforms.py)
+- Transform 2: This transform does... (specific details and example for the second transform found in src/galactic/transforms.py)
 
 ## Filters
 
 Filters are operations that remove unwanted data based on certain criteria. They are used in the GalacticDataset class to clean the data before it is used for training or inference. Here are the available filters:
 
-- Filter 1: This filter removes...
-- Filter 2: This filter removes...
+- Filter 1: This filter removes... (specific details and example for the first filter found in src/galactic/filters.py)
+- Filter 2: This filter removes... (specific details and example for the second filter found in src/galactic/filters.py)
 
 ## Taggers
 
 Taggers are operations that add tags to the data based on certain criteria. They are used in the GalacticDataset class to annotate the data before it is used for training or inference. Here are the available taggers:
 
-- Tagger 1: This tagger adds...
-- Tagger 2: This tagger adds...
+- Tagger 1: This tagger adds... (specific details and example for the first tagger found in src/galactic/taggers.py)
+- Tagger 2: This tagger adds... (specific details and example for the second tagger found in src/galactic/taggers.py)
 
 ## Loading Data
 
