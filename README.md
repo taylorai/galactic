@@ -8,6 +8,27 @@ To get started, install the package (`pip install galactic-ai`) and import it:
 from galactic import GalacticDataset
 ```
 
+## Transforms
+
+Transforms are operations that modify the data in some way. They are used in the GalacticDataset class to preprocess the data before it is used for training or inference. Here are the available transforms:
+
+- Transform 1: This transform does...
+- Transform 2: This transform does...
+
+## Filters
+
+Filters are operations that remove unwanted data based on certain criteria. They are used in the GalacticDataset class to clean the data before it is used for training or inference. Here are the available filters:
+
+- Filter 1: This filter removes...
+- Filter 2: This filter removes...
+
+## Taggers
+
+Taggers are operations that add tags to the data based on certain criteria. They are used in the GalacticDataset class to annotate the data before it is used for training or inference. Here are the available taggers:
+
+- Tagger 1: This tagger adds...
+- Tagger 2: This tagger adds...
+
 ## Loading Data
 
 The src/galactic/loaders.py file contains methods for loading data into a GalacticDataset from various formats. Here are the available methods:
