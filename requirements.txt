@@ -16,3 +16,5 @@ huggingface_hub
 networkx
 sklearn.cluster
 transformers
+colorama
+tiktoken

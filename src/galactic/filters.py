@@ -1,15 +1,49 @@
 # there are 2 types of filter: stateless filter that can operate on only a single example,
 # or a stateful filter (e.g. Bloom filter) where examples depend on each other.
 import re
-import logging
+import json
 import pybloom_live
-from typing import Sequence, Callable, Optional
+from typing import Sequence
 
-logging.basicConfig(level=logging.INFO)
+import logging
+
+logger = logging.getLogger("galactic")
 
 
-def apply_bloom_filter():
-    pass
+def apply_bloom_filter(self, fields: Sequence[str], inplace: bool = True):
+    bloom = pybloom_live.BloomFilter(
+        capacity=len(self.dataset)
+        if len(self.dataset) < int(1.0e9)
+        else int(1.0e9),
+        error_rate=0.001,
+    )
+
+    def bloom_filter(sample):
+        key = json.dumps({field: sample[field] for field in fields})
+        if key in bloom:
+            return False
+        else:
+            bloom.add(key)
+            return True
+
+    if inplace:
+        self.dataset = self.dataset.filter(bloom_filter)
+        logger.info(
+            f"Filtered dataset in-place with Bloom filter on fields: {fields}"
+        )
+        # return self for chaining
+        return self
+    else:
+        new_dataset = self.dataset.filter(bloom_filter)
+        logger.info(f"Filtered dataset with Bloom filter on fields: {fields}")
+        return type(self)(
+            new_dataset,
+            model=self.model,
+            emb_matrix=self.emb_matrix,
+            cluster_ids=self.cluster_ids,
+            cluster_centers=self.cluster_centers,
+            openai_api_key=self.openai_api_key,
+        )
 
 
 # these filters are methods to attach to the GalacticDataset class.
@@ -40,18 +74,29 @@ def filter_string(
 
     if inplace:
         self.dataset = self.dataset.filter(filter_)
-        logging.info(
+        logger.info(
             f"Filtered dataset in-place with exact string matching on fields: {fields}"
         )
         # return self for chaining
         return self
     else:
         new_dataset = self.dataset.filter(filter_)
-        logging.info(f"Filtered dataset with exact string matching on fields: {fields}")
-        return type(self)(new_dataset)
+        logger.info(
+            f"Filtered dataset with exact string matching on fields: {fields}"
+        )
+        return type(self)(
+            new_dataset,
+            model=self.model,
+            emb_matrix=self.emb_matrix,
+            cluster_ids=self.cluster_ids,
+            cluster_centers=self.cluster_centers,
+            openai_api_key=self.openai_api_key,
+        )
 
 
-def filter_regex(self, fields: Sequence[str], regex: str, inplace: bool = True):
+def filter_regex(
+    self, fields: Sequence[str], regex: str, inplace: bool = True
+):
     """
     Filter data containing particular regex in the specified field.
     Args:
@@ -75,12 +120,21 @@ def filter_regex(self, fields: Sequence[str], regex: str, inplace: bool = True):
 
     if inplace:
         self.dataset = self.dataset.filter(filter_)
-        logging.info(
+        logger.info(
             f"Filtered dataset in-place with regex matching on fields: {fields}"
         )
         # return self for chaining
         return self
     else:
         new_dataset = self.dataset.filter(filter_)
-        logging.info(f"Filtered dataset with regex matching on fields: {fields}")
-        return type(self)(new_dataset)
+        logger.info(
+            f"Filtered dataset with regex matching on fields: {fields}"
+        )
+        return type(self)(
+            new_dataset,
+            model=self.model,
+            emb_matrix=self.emb_matrix,
+            cluster_ids=self.cluster_ids,
+            cluster_centers=self.cluster_centers,
+            openai_api_key=self.openai_api_key,
+        )

@@ -1,14 +1,17 @@
+import os
 from typing import Optional, Callable
 import datasets
 import json
-import logging
 import pybloom_live
 from .utils import (
     read_csv,
 )
 from tqdm.auto import tqdm
+import pyarrow.parquet as pq
 
-logging.basicConfig(level=logging.INFO)
+import logging
+
+logger = logging.getLogger("galactic")
 
 
 def from_csv(cls, path: str):
@@ -21,13 +24,22 @@ def from_jsonl(cls, path, **kwargs):
     return cls(dataset)
 
 
+def from_parquet(cls, path, **kwargs):
+    dataset = datasets.load_dataset("parquet", data_files=path, **kwargs)
+    return cls(dataset)
+
+
 def from_pandas(cls, df, **kwargs):
     dataset = datasets.Dataset.from_pandas(df, **kwargs)
     return cls(dataset)
 
 
-def from_hugging_face(cls, path: str, split: str, **kwargs):
-    dataset = datasets.load_dataset(path, split=split, **kwargs)
+def from_hugging_face(
+    cls, path: str, split: str, config_name: Optional[str] = None, **kwargs
+):
+    dataset = datasets.load_dataset(
+        path, name=config_name, split=split, **kwargs
+    )
     return cls(dataset)
 
 
@@ -35,7 +47,7 @@ def from_hugging_face_stream(
     cls,
     path: str,
     split: str,
-    config_name: str = None,
+    config_name: Optional[str] = None,
     filters=list[Callable[[dict], bool]],
     dedup_fields: Optional[list[str]] = None,
     max_samples: Optional[int] = 200000,
@@ -73,10 +85,19 @@ def from_hugging_face_stream(
     msg = f"Loaded {len(samples)} samples from {path}. "
     if idx > len(samples):
         msg += f"Removed {idx - len(samples)} samples that were duplicated. "
-    logging.info(msg)
+    logger.info(msg)
     return cls(datasets.Dataset.from_list(samples))
 
 
-def from_disk(cls, path: str, **kwargs):
-    ds = datasets.Dataset.load_from_disk(path, **kwargs)
-    return cls(ds)
+# save dataset as parquet
+def save(self, path: str, overwrite: bool = False) -> None:
+    # check if exists
+    if os.path.exists(path) and not overwrite:
+        raise ValueError(
+            f"Path {path} already exists. Use overwrite=True to overwrite."
+        )
+    # save
+    pq.write_table(self.dataset.data.table, path)
+    logger.info(
+        f"Saved dataset as Parquet file to {path}. You can load it with GalacticDataset.from_parquet('{path}')."
+    )

@@ -2,7 +2,7 @@ import logging
 import requests
 import pandas as pd
 
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("galactic")
 
 
 def byte_len(x: str):
@@ -30,6 +30,8 @@ def read_csv(path: str):
         df = pd.read_csv(path)
         return df
     except Exception as e:
-        logging.warning("Unable to parse CSV file. Falling back to latin-1 encoding.")
+        logger.warning(
+            "Unable to parse CSV file. Falling back to latin-1 encoding."
+        )
         df = pd.read_csv(path, encoding="latin-1")
         return df
