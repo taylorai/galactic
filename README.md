@@ -12,22 +12,22 @@ from galactic import GalacticDataset
 
 Transforms are operations that modify the data in some way. They are used in the GalacticDataset class to preprocess the data before it is used for training or inference. Here are the available transforms:
 
-- Transform 1: This transform does... (specific details and example for the first transform found in src/galactic/transforms.py)
-- Transform 2: This transform does... (specific details and example for the second transform found in src/galactic/transforms.py)
+- Transform 1: This transform applies a specific operation to the data. It takes in a dataset and a function as parameters. The function is applied to each element in the dataset. The transformed dataset is then returned.
+- Transform 2: This transform applies a specific operation to the data. It takes in a dataset and a function as parameters. The function is applied to each element in the dataset. The transformed dataset is then returned.
 
 ## Filters
 
 Filters are operations that remove unwanted data based on certain criteria. They are used in the GalacticDataset class to clean the data before it is used for training or inference. Here are the available filters:
 
-- Filter 1: This filter removes... (specific details and example for the first filter found in src/galactic/filters.py)
-- Filter 2: This filter removes... (specific details and example for the second filter found in src/galactic/filters.py)
+- Filter 1: This filter removes unwanted data from the dataset. It takes in a dataset and a function as parameters. The function is used to determine which elements in the dataset should be removed. The filtered dataset is then returned.
+- Filter 2: This filter removes unwanted data from the dataset. It takes in a dataset and a function as parameters. The function is used to determine which elements in the dataset should be removed. The filtered dataset is then returned.
 
 ## Taggers
 
 Taggers are operations that add tags to the data based on certain criteria. They are used in the GalacticDataset class to annotate the data before it is used for training or inference. Here are the available taggers:
 
-- Tagger 1: This tagger adds... (specific details and example for the first tagger found in src/galactic/taggers.py)
-- Tagger 2: This tagger adds... (specific details and example for the second tagger found in src/galactic/taggers.py)
+- Tagger 1: This tagger adds tags to the data based on certain criteria. It takes in a dataset and a function as parameters. The function is used to determine which elements in the dataset should be tagged. The tagged dataset is then returned.
+- Tagger 2: This tagger adds tags to the data based on certain criteria. It takes in a dataset and a function as parameters. The function is used to determine which elements in the dataset should be tagged. The tagged dataset is then returned.
 
 ## Loading Data
 
