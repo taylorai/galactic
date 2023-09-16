@@ -1,5 +1,10 @@
 # Galactic
+
+![jpg](galactic.jpeg)
+
 Galactic provides cleaning and curation tools for massive unstructured text datasets. It's designed to help you curate fine-tuning datasets, create document collections for retrieval-augmented generation (RAG), and even perform deduplication of web-scale datasets for LLM pre-training. This README provides a non-exhaustive overview of what Galactic can do; for more details, check out the [API reference](https://github.com/taylorai/galactic/blob/main/API_REFERENCE.md).
+
+
 
 ## Getting Started
 To get started, install the package (`pip install galactic-ai`) and import it:
@@ -34,7 +39,7 @@ dataset = dataset.count_tokens(fields=["content"], tokenizer="gpt2")
 plt.hist(dataset["__token_count__content"], bins=50);
 ```
     
-![png](image.png)
+![png](graph.png)
     
 
 ```python
@@ -139,7 +144,7 @@ dataset.get_cluster_info(field="content")
     Cluster 8 (461 items)
     Cluster 9 (300 items)
 
-Semantic deduplication within clusters is carried out with `semdedup`. You can provide a target retention rate for what percent of data you want to keep (the threshold will be tuned to achieve roughly this rate), or you can provide a cosine similarity threshold, and pairs within a cluster whose similarity is above the threshold will be considered duplicates.
+Semantic deduplication within clusters is carried out with `semdedup` (inspired by [this paper](https://arxiv.org/abs/2303.09540)). You can provide a target retention rate for what percent of data you want to keep (the threshold will be tuned to achieve roughly this rate), or you can provide a cosine similarity threshold, and pairs within a cluster whose similarity is above the threshold will be considered duplicates.
 
 
 ```python
@@ -172,6 +177,6 @@ dataset.save("my_dataset.jsonl")
 This first release is just a taste of what we have planned for Galactic. Here's what you have to look forward to:
 * __AI Data Labeling:__ Use API language models like OpenAI, or small local models, to automatically tag or filter your data for you. We'll also provide more fast classifiers (as with language identification) to do things like flag SEO spam, or detect if a sample is text vs. source code.
 * __More Powerful Deduplication:__ We will add Minhash-LSH to remove near-duplicates before you even have to compute embeddings. We will also add support for [D4](https://arxiv.org/abs/2308.12284), which follows semantic deduplication with a "diversification" step, keeping data that's further from cluster centroids.
-* __Scaling:__ The features we've built so far can handle thousands or even hundreds of thousands of examples without breaking a sweat, but for true web-scale data processing, local embeddings start to feel slow, and memory becomes precious. We're working on features to allow Galactic to scale gracefully to millions of examples.
+* __Scaling:__ The features we've built so far can handle thousands or even hundreds of thousands of examples without breaking a sweat, but for true web-scale data processing, local embeddings start to feel slow, and memory becomes precious. We're working on features (like smaller, faster embeddings) to allow Galactic to scale gracefully to millions of examples.
 
 If you like what we're doing, throw us a star on GitHub (or even better, contribute!), and stay tuned for more.

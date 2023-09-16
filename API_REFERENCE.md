@@ -38,13 +38,12 @@ ds = GalacticDataset.from_csv("data.csv")
 
 ```python
 @classmethod
-def from_jsonl(cls, path: str, **kwargs) -> 'GalacticDataset':
+def from_jsonl(cls, path: str) -> 'GalacticDataset':
 ```
 
 **Parameters:**
 
 - `path (str)`: The path to the JSONL file.
-- `**kwargs`: Additional parameters passed to `datasets.load_dataset`.
 
 **Returns:**
 
@@ -86,13 +85,12 @@ ds = GalacticDataset.from_parquet("data.parquet")
 
 ```python
 @classmethod
-def from_pandas(cls, df, **kwargs) -> 'GalacticDataset':
+def from_pandas(cls, df) -> 'GalacticDataset':
 ```
 
 **Parameters:**
 
 - `df`: A Pandas DataFrame.
-- `**kwargs`: Additional parameters passed to `datasets.Dataset.from_pandas`.
 
 **Returns:**
 
@@ -181,6 +179,8 @@ ds = GalacticDataset.from_hugging_face_stream("squad", split="train", filters=fi
 
 ### `save`
 
+Saves the dataset to JSONL.
+
 ```python
 def save(self, path: str, overwrite: bool = False) -> None:
 ```
@@ -197,7 +197,7 @@ def save(self, path: str, overwrite: bool = False) -> None:
 **Example:**
 
 ```python
-ds.save("data.parquet")
+ds.save("data.jsonl")
 ```
 
 ---
@@ -379,6 +379,8 @@ ds.detect_language('text_field')
 
 ### `calc_perplexity`
 
+Warning: This is pretty slow, currently uses Pythia-70m. In the future, will substitute something smaller and faster like KenLM.
+
 ```python
 def calc_perplexity(self, field: str) -> 'GalacticDataset':
 ```
@@ -474,7 +476,7 @@ ds.get_embeddings('text_field')
 ### `get_nearest_neighbors`
 
 ```python
-def get_nearest_neighbors(self, query: Union[str, np.ndarray], k: int = 5) -> pd.DataFrame:
+def get_nearest_neighbors(self, query: Union[str, np.ndarray], k: int = 5) -> list[dict]:
 ```
 
 **Parameters:**
@@ -484,7 +486,7 @@ def get_nearest_neighbors(self, query: Union[str, np.ndarray], k: int = 5) -> pd
 
 **Returns:**
 
-- `pd.DataFrame`: DataFrame containing the top-k nearest neighbors.
+- `list[dict]` of nearest neighbors by cosine similarity.
 
 **Example:**
 
@@ -548,10 +550,6 @@ def remove_cluster(self, cluster: int) -> None:
 ```python
 ds.remove_cluster(1)
 ```
-
----
-
-Great, let's document the `semdedup` method for the `GalacticDataset` class.
 
 ---
 
