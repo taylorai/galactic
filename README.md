@@ -1,589 +1,177 @@
 # Galactic
+Galactic provides cleaning and curation tools for massive unstructured text datasets. It's designed to help you curate fine-tuning datasets, create document collections for retrieval-augmented generation (RAG), and even perform deduplication of web-scale datasets for LLM pre-training. This README provides a non-exhaustive overview of what Galactic can do; for more details, check out the [API reference](https://github.com/taylorai/galactic/blob/main/API_REFERENCE.md).
 
-Cleaning and curation tools for massive unstructured text datasets.
-
+## Getting Started
 To get started, install the package (`pip install galactic-ai`) and import it:
 
 ```python
 from galactic import GalacticDataset
 ```
 
-## Loading and Saving Data
+## Loading Data
 
-
-### `from_csv`
-
-```python
-@classmethod
-def from_csv(cls, path: str) -> 'GalacticDataset':
-```
-
-**Parameters:**
-
-- `path (str)`: The path to the CSV file.
-
-**Returns:**
-
-- `GalacticDataset`: A dataset instance initialized from the CSV file.
-
-**Example:**
+Galactic can load datasets from typical file formats (CSV, JSONL, Parquet), as well as from HuggingFace. If you're loading a massive dataset from HuggingFace, you can even filter data as it streams in, ensuring you don't load any duplicates, and you only hang on to data you want. For instance, here we will load the Falcon RefinedWeb dataset, but automatically deduplicate it, and only keep examples with fewer than 1024 characters. Let's get 5000 samples that meet our requirements.
 
 ```python
-ds = GalacticDataset.from_csv("data.csv")
+filter_func = lambda x: len(x['content']) < 1024
+dataset = GalacticDataset.from_hugging_face_stream(
+    "tiiuae/falcon-refinedweb",
+    split="train",
+    filters=[filter_func],
+    dedup_fields=["content"],
+    max_samples=5000
+)
 ```
 
----
 
-### `from_jsonl`
+## Understanding the Data
+Galactic is designed to help you understand unstructured text datasets. Let's start with some basics: we'll get the lengths of the texts using our tokenizer of choice, detect the language of the text, and scan for PII.
+
 
 ```python
-@classmethod
-def from_jsonl(cls, path: str, **kwargs) -> 'GalacticDataset':
+import matplotlib.pyplot as plt
+dataset = dataset.count_tokens(fields=["content"], tokenizer="gpt2")
+plt.hist(dataset["__token_count__content"], bins=50);
 ```
-
-**Parameters:**
-
-- `path (str)`: The path to the JSONL file.
-- `**kwargs`: Additional parameters passed to `datasets.load_dataset`.
-
-**Returns:**
-
-- `GalacticDataset`: A dataset instance initialized from the JSONL file.
-
-**Example:**
+    
+![png](image.png)
+    
 
 ```python
-ds = GalacticDataset.from_jsonl("data.jsonl")
+from collections import Counter
+dataset.detect_language(field="content")
+Counter(dataset["__language"])
 ```
+    INFO: Detected language in field content, added language metadata to '__language'.
 
----
-
-### `from_parquet`
+    Counter({'en': 4975,
+             'es': 7,
+             'fr': 7,
+             'de': 3,
+             'da': 2,
+             'ru': 1,
+             'nl': 1,
+             'pt': 1,
+             'sh': 1,
+             'eo': 1,
+             'ceb': 1})
 
 ```python
-@classmethod
-def from_jsonl(cls, path: str) -> 'GalacticDataset':
+dataset.detect_pii(
+    fields=["content"]
+)
+print("Email:", sum(dataset["__pii__email"]))
+print("Phone:", sum(dataset["__pii__phone"]))
+print("Username/Password:", sum(dataset["__pii__credential"]))
 ```
 
-**Parameters:**
+    INFO: Detected PII in fields: ['content']; added __pii__email, __pii__phone, __pii__credential, and __pii__any metadata.
 
-- `path (str)`: The path to the Parquet file.
 
-**Returns:**
+    Email: 285
+    Phone: 242
+    Username/Password: 9
 
-- `GalacticDataset`: A dataset instance initialized from the Parquet file.
 
-**Example:**
+## Custom Tagging & Filtering
+The built-in functions are just to get you started--Galactic allows you to tag and filter your data however you want. For instance, here we'll do the following:
+* Filter out all examples that have "blogspot" in the URL.
+* Tag all examples that mention fruit or vegetables.
+
 
 ```python
-ds = GalacticDataset.from_parquet("data.parquet")
-
+dataset = dataset.filter_string(
+    fields=["url"],
+    values=["blogspot"]
+)
+len(dataset)
 ```
 
----
+    INFO: Filtered dataset in-place with exact string matching on fields: ['url']
 
-### `from_pandas`
+    4902
 
 ```python
-@classmethod
-def from_pandas(cls, df, **kwargs) -> 'GalacticDataset':
+dataset = dataset.tag_regex(
+    fields=["content"],
+    regex="fruit|Fruit|vegetable|Vegetable|veggie|Veggie",
+    tag="fruit_veggie"
+)
+f'{sum(dataset["__tag__fruit_veggie"])} records tagged with __tag__fruit_veggie'
+
 ```
 
-**Parameters:**
+    INFO: Tagged dataset in-place with tag '__tag__fruit_veggie', using regex matching on fields: ['content']
 
-- `df`: A Pandas DataFrame.
-- `**kwargs`: Additional parameters passed to `datasets.Dataset.from_pandas`.
+    '38 records tagged with __tag__fruit_veggie'
 
-**Returns:**
 
-- `GalacticDataset`: A dataset instance initialized from the DataFrame.
 
-**Example:**
+## Embeddings & Clustering
+
+Text embeddings are a great way to explore and understand unstructured data. Galactic can compute embeddings right on your CPU with the `gte-small` model, and then use them to cluster and deduplicate your data. (You also have the option to use OpenAI API embeddings as the backend--they're faster, but each embedding is larger, and you have to provide an API key.) On my Intel Macbook (no fancy M1 or M2), I can compute 1000 embeddings in a couple minutes. Longer texts also take longer since they have to be chunked into 512-token segments.
+
 
 ```python
-import pandas as pd
-df = pd.read_csv("data.csv")
-ds = GalacticDataset.from_pandas(df)
+# to use openai, set dataset.openai_api_key = [...], and use backend="openai"
+dataset.get_embeddings(field="content", backend="cpu")
 ```
 
----
+    INFO: Created embeddings on field 'content'
 
-### `from_hugging_face`
+Once we've computed embeddings for a dataset, we can cluster it with k-means. Clusters can help discover domains in the data, or subsets that we might want to remove. They can also be used downstream for intra-cluster semantic deduplication (i.e. removing examples that share a cluster and are very close by in the embedding space).
+
 
 ```python
-@classmethod
-def from_hugging_face(
-   cls, 
-   path: str, 
-   split: str,  
-   config_name: Optional[str] = None,
-   **kwargs
-) -> 'GalacticDataset':
+dataset.cluster(n_clusters=10)
+dataset.get_cluster_info(field="content")
 ```
 
-**Parameters:**
 
-- `path (str)`: The identifier of the Hugging Face dataset.
-- `split (str)`: The desired split ('train', 'validation', 'test').
-- `config_name (str, optional)`: Specific dataset configuration name. (For example, for C4, a config name like `en` or `realnewslike` is required).
-- `**kwargs`: Additional parameters passed to `datasets.load_dataset`.
+    Cluster 0 (550 items)
+    Cluster 1 (549 items)
+    Cluster 2 (673 items)
+    Cluster 3 (468 items)
+    Cluster 4 (403 items)
+    Cluster 5 (592 items)
+    Cluster 6 (290 items)
+    Cluster 7 (616 items)
+    Cluster 8 (461 items)
+    Cluster 9 (300 items)
 
-**Returns:**
+Semantic deduplication within clusters is carried out with `semdedup`. You can provide a target retention rate for what percent of data you want to keep (the threshold will be tuned to achieve roughly this rate), or you can provide a cosine similarity threshold, and pairs within a cluster whose similarity is above the threshold will be considered duplicates.
 
-- `GalacticDataset`: A dataset instance initialized from the Hugging Face dataset.
-
-**Example:**
 
 ```python
-ds = GalacticDataset.from_hugging_face("squad", split="train")
+dataset.semdedup(target_retention=0.75)
 ```
 
----
+    INFO: Tuning threshold on 3 clusters...
+    INFO: Threshold: 0.92
+    INFO: Cluster 0 has 106 duplicates (19.3%).
+    INFO: Cluster 1 has 133 duplicates (24.2%).
+    INFO: Cluster 2 has 489 duplicates (72.7%).
+    INFO: Cluster 3 has 125 duplicates (26.7%).
+    INFO: Cluster 4 has 96 duplicates (23.8%).
+    INFO: Cluster 5 has 354 duplicates (59.8%).
+    INFO: Cluster 6 has 80 duplicates (27.6%).
+    INFO: Cluster 7 has 96 duplicates (15.6%).
+    INFO: Cluster 8 has 174 duplicates (37.7%).
+    INFO: Cluster 9 has 25 duplicates (8.3%).
+    INFO: Removed 1678 / 4902 items flagged as semantic near-duplicates (34.23%).
 
-### `from_hugging_face_stream`
+## Saving the result
+
+Finally, let's save this data--either for more Galactic goodness later on (who wants to compute those embeddings again?), or so we can use it downstream for retrieval or fine-tuning.
 
 ```python
-@classmethod
-def from_hugging_face_stream(
-    cls,
-    path: str,
-    split: str,
-    config_name: Optional[str] = None,
-    filters: list[Callable[[dict], bool]] = [],
-    dedup_fields: Optional[list[str]] = None,
-    max_samples: Optional[int] = 200000,
-    **kwargs
-) -> 'GalacticDataset':
+dataset.save("my_dataset.jsonl")
 ```
 
-**Parameters:**
-
-- `path (str)`: The identifier of the Hugging Face dataset.
-- `split (str)`: The desired split ('train', 'validation', 'test').
-- `config_name (str, optional)`: Specific dataset configuration name. (For example, for C4, a config name like `en` or `realnewslike` is required).
-- `filters (list[Callable], optional)`: List of filter functions to apply.
-- `dedup_fields (list[str], optional)`: Fields to check for duplicates.
-- `max_samples (int, optional)`: Maximum number of samples to load, after filtering.
-- `**kwargs`: Additional parameters passed to HuggingFace `datasets.load_dataset`.
-
-**Returns:**
-
-- `GalacticDataset`: A dataset instance initialized from the Hugging Face dataset.
-
-**Example:**
-
-```python
-filters = [lambda x: x['field'] > 1]
-ds = GalacticDataset.from_hugging_face_stream("squad", split="train", filters=filters)
-```
-
----
-
-### `save`
-
-```python
-def save(self, path: str, overwrite: bool = False) -> None:
-```
-
-**Parameters:**
-
-- `path (str)`: The path to save the dataset to.
-- `overwrite (bool, optional)`: Whether to overwrite the file if it already exists.
-
-**Returns:**
-
-- `None`
-
-**Example:**
-
-```python
-ds.save("data.parquet")
-```
-
----
-
-## Filtering Data
-
-### `apply_bloom_filter`
-
-A Bloom filter is a memory-efficient, probabilistic data structure for exact-deduplication, which allows you to deduplicate with a single pass over the dataset rather than comparing all possible pairs. It guarantees there will be no false negatives--all actual duplicates *will* be removed. But there is a small probability of false positives, which means a small number of non-duplicates may be removed.
-
-```python
-def apply_bloom_filter(self, fields: Sequence[str], inplace: bool = True) -> 'GalacticDataset':
-```
-
-**Parameters:**
-
-- `fields (Sequence[str])`: List of fields to apply the Bloom filter on. Two records will be considered duplicates if they match *all* of these fields.
-- `inplace (bool, default=True)`: Whether to modify the dataset in-place.
-
-**Returns:**
-
-- `GalacticDataset`: Modified dataset with filtered records.
-
-**Example:**
-
-```python
-ds.apply_bloom_filter(['text_field'])
-```
-
----
-
-### `filter_string`
-
-```python
-def filter_string(self, fields: Sequence[str], values: Sequence[str], inplace: bool = True) -> 'GalacticDataset':
-```
-
-**Parameters:**
-
-- `fields (Sequence[str])`: List of fields to apply the filter on.
-- `values (Sequence[str])`: List of string values to filter out.
-- `inplace (bool, default=True)`: Whether to modify the dataset in-place.
-
-**Returns:**
-
-- `GalacticDataset`: Modified dataset with filtered records.
-
-**Example:**
-
-```python
-ds.filter_string(['text_field'], ['exclude_this', 'and_this'])
-```
-
----
-
-### `filter_regex`
-
-```python
-def filter_regex(self, fields: Sequence[str], regex: str, inplace: bool = True) -> 'GalacticDataset':
-```
-
-**Parameters:**
-
-- `fields (Sequence[str])`: List of fields to apply the regex-based filter on.
-- `regex (str)`: The regex pattern to filter out.
-- `inplace (bool, default=True)`: Whether to modify the dataset in-place.
-
-**Returns:**
-
-- `GalacticDataset`: Modified dataset with filtered records.
-
-**Example:**
-
-```python
-ds.filter_regex(['text_field'], r'\d+')
-```
-
----
-
-Feel free to modify the descriptions and examples as you see fit.
-
----
-
-## Processing Data
-
-
-### `trim_whitespace`
-
-```python
-def trim_whitespace(self, fields: Sequence[str], inplace: bool = True) -> 'GalacticDataset':
-```
-
-**Parameters:**
-
-- `fields (Sequence[str])`: List of fields to trim whitespace for.
-- `inplace (bool, default=True)`: Whether to modify the dataset in-place.
-
-**Returns:**
-
-- `GalacticDataset`: Modified dataset with trimmed fields.
-
-**Example:**
-
-```python
-ds.trim_whitespace(['text_field'])
-```
-
----
-
-### `tag_string`
-
-```python
-def tag_string(self, fields: Sequence[str], values: Sequence[str], tag: str) -> 'GalacticDataset':
-```
-
-**Parameters:**
-
-- `fields (Sequence[str])`: List of fields to apply the tag.
-- `values (Sequence[str])`: List of values to tag.
-- `tag (str)`: The tag to be applied.
-
-**Returns:**
-
-- `GalacticDataset`: Modified dataset with new tags.
-
-**Example:**
-
-```python
-ds.tag_string(['text_field'], ['value1', 'value2'], 'my_tag')
-```
-
----
-
-### `tag_regex`
-
-```python
-def tag_regex(self, fields: Sequence[str], regex: str, tag: str) -> 'GalacticDataset':
-```
-
-**Parameters:**
-
-- `fields (Sequence[str])`: List of fields to apply the regex-based tag.
-- `regex (str)`: The regex pattern.
-- `tag (str)`: The tag to be applied.
-
-**Returns:**
-
-- `GalacticDataset`: Modified dataset with new tags.
-
-**Example:**
-
-```python
-ds.tag_regex(['text_field'], r'\d+', 'contains_number')
-```
-
----
-
-### `detect_language`
-
-```python
-def detect_language(self, field: str) -> 'GalacticDataset':
-```
-
-**Parameters:**
-
-- `field (str)`: Field to detect the language for.
-
-**Returns:**
-
-- `GalacticDataset`: Modified dataset with detected languages.
-
-**Example:**
-
-```python
-ds.detect_language('text_field')
-```
-
----
-
-### `calc_perplexity`
-
-```python
-def calc_perplexity(self, field: str) -> 'GalacticDataset':
-```
-
-**Parameters:**
-
-- `field (str)`: Field to calculate the perplexity for.
-
-**Returns:**
-
-- `GalacticDataset`: Modified dataset with calculated perplexities.
-
-**Example:**
-
-```python
-ds.calc_perplexity('text_field')
-```
-
----
-
-### `detect_pii`
-
-```python
-def detect_pii(self, fields: Sequence[str]) -> 'GalacticDataset':
-```
-
-**Parameters:**
-
-- `fields (Sequence[str])`: List of fields to detect PII in.
-
-**Returns:**
-
-- `GalacticDataset`: Modified dataset with detected PII.
-
-**Example:**
-
-```python
-ds.detect_pii(['email_field', 'phone_field'])
-```
-
----
-
-### `count_tokens`
-
-Counts tokens for each of the specified fields using the provided tokenizer (which is a string path to a Hugging Face tokenizer). If no tokenizer is provided, counts bytes instead.
-
-```python
-def count_tokens(self, fields: Sequence[str], tokenizer: Optional[str] = None) -> 'GalacticDataset':
-```
-
-**Parameters:**
-
-- `fields (Sequence[str])`: List of fields to count tokens for.
-- `tokenizer (str, optional)`: Tokenizer to use for token counting.
-
-**Returns:**
-
-- `GalacticDataset`: Modified dataset with token (or byte) counts.
-
-**Example:**
-
-```python
-ds.count_tokens(['text_field'], tokenizer="some_tokenizer")
-```
----
-
-## Embedding and Clustering
-
-
-### `get_embeddings`
-
-```python
-def get_embeddings(self, field: str, backend: str = "auto") -> 'GalacticDataset':
-```
-
-**Parameters:**
-
-- `field (str)`: The field to create embeddings for.
-- `backend (str, default='auto')`: The backend to use for generating embeddings. Currently, options are limited to "cpu" and "openai". If "auto", will use "cpu". If using "openai", you need to first set the `openai_api_key` attribute on the dataset.
-
-**Returns:**
-
-- `GalacticDataset`: Modified dataset with added embeddings.
-
-**Example:**
-
-```python
-ds.get_embeddings('text_field')
-```
-
----
-
-### `get_nearest_neighbors`
-
-```python
-def get_nearest_neighbors(self, query: Union[str, np.ndarray], k: int = 5) -> pd.DataFrame:
-```
-
-**Parameters:**
-
-- `query (str or np.ndarray)`: The query to find the nearest neighbors for.
-- `k (int, default=5)`: Number of nearest neighbors to return.
-
-**Returns:**
-
-- `pd.DataFrame`: DataFrame containing the top-k nearest neighbors.
-
-**Example:**
-
-```python
-ds.get_nearest_neighbors('sample query')
-```
-
----
-
-### `cluster`
-
-```python
-def cluster(self, n_clusters: int, method: str = "kmeans", batch_size: int = 1024, n_epochs: int = 5) -> None:
-```
-
-**Parameters:**
-
-- `n_clusters (int)`: Number of clusters to form.
-- `method (str, default='kmeans')`: Clustering method to use. Options are 'kmeans' or 'minibatch_kmeans'.
-- `batch_size (int, default=1024)`: Batch size for 'minibatch_kmeans'.
-- `n_epochs (int, default=5)`: Number of epochs for 'minibatch_kmeans'.
-
-**Example:**
-
-```python
-ds.cluster(10)
-```
-
----
-
-### `get_cluster_info`
-
-```python
-def get_cluster_info(self) -> None:
-```
-
-**Description:**
-
-- Provides information about the clusters, such as their sizes and prototypical examples.
-
-**Example:**
-
-```python
-ds.get_cluster_info()
-```
-
----
-
-### `remove_cluster`
-
-```python
-def remove_cluster(self, cluster: int) -> None:
-```
-
-**Parameters:**
-
-- `cluster (int)`: The cluster ID to remove.
-
-**Example:**
-
-```python
-ds.remove_cluster(1)
-```
-
----
-
-Great, let's document the `semdedup` method for the `GalacticDataset` class.
-
----
-
-### `semdedup`
-
-```python
-def semdedup(
-    self,
-    target_retention: Optional[float] = 0.8,
-    threshold: Optional[float] = None,
-    inplace: bool = True
-) -> 'GalacticDataset':
-```
-
-**Parameters:**
-
-- `target_retention (float, optional)`: The fraction of data points to retain after deduplication. If specified, the method will automatically tune the similarity on a few clusters, targeting this level of retention. Default is 0.8.
-  
-- `threshold (float, optional)`: The similarity threshold for marking duplicates (cosine similarity). Ignored if `target_retention` is specified.
-
-- `inplace (bool, default=True)`: Whether to modify the dataset in-place or return a new one.
-
-**Returns:**
-
-- `GalacticDataset`: The dataset with semantic duplicates removed. Returns `self` if `inplace=True`.
-
-**Raises:**
-
-- `ValueError`: If neither `target_retention` nor `threshold` are specified.
-
-**Example:**
-
-```python
-ds.semdedup(target_retention=0.8)
-```
+## What's Next?
+This first release is just a taste of what we have planned for Galactic. Here's what you have to look forward to:
+* __AI Data Labeling:__ Use API language models like OpenAI, or small local models, to automatically tag or filter your data for you. We'll also provide more fast classifiers (as with language identification) to do things like flag SEO spam, or detect if a sample is text vs. source code.
+* __More Powerful Deduplication:__ We will add Minhash-LSH to remove near-duplicates before you even have to compute embeddings. We will also add support for [D4](https://arxiv.org/abs/2308.12284), which follows semantic deduplication with a "diversification" step, keeping data that's further from cluster centroids.
+* __Scaling:__ The features we've built so far can handle thousands or even hundreds of thousands of examples without breaking a sweat, but for true web-scale data processing, local embeddings start to feel slow, and memory becomes precious. We're working on features to allow Galactic to scale gracefully to millions of examples.
+
+If you like what we're doing, throw us a star on GitHub (or even better, contribute!), and stay tuned for more.
