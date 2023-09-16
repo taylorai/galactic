@@ -77,7 +77,8 @@ class APIRequest:
     ):
         try:
             status_tracker.total_requests += 1
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=20)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(
                     url=self.url,
                     headers=request_header,
@@ -120,6 +121,8 @@ async def process_api_requests_from_list(
     api_key: str,
     max_attempts: int,
     system_prompt: Optional[str] = None,
+    max_tokens_per_minute: int = 90_000,
+    max_requests_per_minute: int = 2000,
 ):
     if type not in ["embedding", "chat"]:
         raise ValueError("type must be either 'embedding' or 'chat'")
@@ -142,8 +145,6 @@ async def process_api_requests_from_list(
     next_request = None  # variable to hold the next request to call
 
     # initialize available capacity counts
-    max_requests_per_minute = 3500 if type == "embedding" else 2000
-    max_tokens_per_minute = 350_000 if type == "embedding" else 90_000
     available_request_capacity = max_requests_per_minute
     available_token_capacity = max_tokens_per_minute
     last_update_time = time.time()
@@ -266,7 +267,11 @@ async def process_api_requests_from_list(
 
 
 def embed_texts_with_openai(
-    texts: list[str], api_key: str, max_attempts: int = 10
+    texts: list[str],
+    api_key: str,
+    max_attempts: int = 10,
+    max_tokens_per_minute: int = 350_000,
+    max_requests_per_minute: int = 3500,
 ):
     results = asyncio.run(
         process_api_requests_from_list(
@@ -274,6 +279,8 @@ def embed_texts_with_openai(
             type="embedding",
             api_key=api_key,
             max_attempts=max_attempts,
+            max_requests_per_minute=max_requests_per_minute,
+            max_tokens_per_minute=max_tokens_per_minute,
         )
     )
     # extract the embeddings
@@ -294,6 +301,8 @@ def run_chat_queries_with_openai(
     api_key: str,
     system_prompt: Optional[str] = None,
     max_attempts: int = 10,
+    max_tokens_per_minute: int = 90_000,
+    max_requests_per_minute: int = 2000,
 ):
     results = asyncio.run(
         process_api_requests_from_list(
@@ -302,15 +311,17 @@ def run_chat_queries_with_openai(
             api_key=api_key,
             max_attempts=max_attempts,
             system_prompt=system_prompt,
+            max_requests_per_minute=max_requests_per_minute,
+            max_tokens_per_minute=max_tokens_per_minute,
         )
     )
     # extract the replies
-    replies = []
-    for result in sorted(results, key=lambda x: x.task_id):
+    replies = [None for _ in range(len(queries))]
+    for result in results:
         if "error" in result.result[-1].keys():
-            replies.append(None)
+            replies[result.task_id] = None
         else:
-            replies.append(
-                result.result[-1]["choices"][0]["message"]["content"]
-            )
+            replies[result.task_id] = result.result[-1]["choices"][0][
+                "message"
+            ]["content"]
     return replies

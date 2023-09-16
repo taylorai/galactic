@@ -46,6 +46,8 @@ def ai_column(
     prompt: str,
     depends_on=list[str],
     system_prompt: Optional[str] = None,
+    max_tokens_per_minute: int = 90_000,
+    max_requests_per_minute: int = 2000,
     inplace: bool = True,
 ):
     """
@@ -69,10 +71,13 @@ def ai_column(
     prompts = self.dataset.select_columns(depends_on).map(
         lambda sample: {"__prompt": template.render(**sample)}
     )["__prompt"]
+    logger.info(f"Example prompt: {prompts[0]}")
     responses = run_chat_queries_with_openai(
         queries=prompts,
         api_key=self.openai_api_key,
         system_prompt=system_prompt,
+        max_tokens_per_minute=max_tokens_per_minute,
+        max_requests_per_minute=max_requests_per_minute,
     )
     if inplace:
         self.dataset = self.dataset.add_column(name=name, column=responses)
