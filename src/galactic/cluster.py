@@ -56,7 +56,7 @@ def remove_cluster(self, cluster: int):
     del self.cluster_centers[cluster]
 
 
-def get_cluster_info(self):
+def get_cluster_info(self, n_neighbors: int = 3, field: str = None):
     """
     Goal is to do some kind of unsupervised domain discovery thing here to figure out what the clusters mean.
     """
@@ -75,4 +75,10 @@ def get_cluster_info(self):
     for id, emb in self.cluster_centers.items():
         print(f"Cluster {id} ({counts[id]} items)")
         nn = self.get_nearest_neighbors(emb, k=3)
-        print(nn)
+        if field is not None:
+            for n in nn:
+                print("\t" + n[field])
+                print("---")
+        else:
+            for n in nn:
+                print({k: v for k, v in n.items() if k != "__embedding"})

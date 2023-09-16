@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 
 [project]
 name = "galactic-ai"
-version="0.1.0"
+version="0.1.8"
 authors = [
     {name = "Benjamin Anderson", email = "ben@trytaylor.ai"},
 ]
@@ -14,6 +14,7 @@ keywords = []
 license = {text = "ELv2"}
 classifiers = []
 dependencies = [
+    "colorama",
     "datasets",
     "ctranslate2",
     "onnxruntime",
@@ -26,7 +27,10 @@ dependencies = [
     "networkx",
     "scikit-learn",
     "scrubadub", 
-    "fasttext"
+    "fasttext",
+    "pyarrow",
+    "openai",
+    "tiktoken"
 ]
 
 [tool.black]

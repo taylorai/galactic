@@ -44,7 +44,7 @@ def tag_regex(self, fields: Sequence[str], regex: str, tag: str):
     # make sure the tag hasn't already been used
     if f"__tag__{tag}" in self.dataset.column_names:
         logger.warning(
-            f"Tag {tag} already exists. This will overwrite the existing tag."
+            f"Tag already exists. This will overwrite the existing tag."
         )
 
     regexp = re.compile(regex)
@@ -62,7 +62,7 @@ def tag_regex(self, fields: Sequence[str], regex: str, tag: str):
 
     self.dataset = self.dataset.map(tag_)
     logger.info(
-        f"Tagged dataset in-place with regex matching on fields: {fields}"
+        f"Tagged dataset in-place with tag '__tag__{tag}', using regex matching on fields: {fields}"
     )
     return self
 
@@ -93,6 +93,9 @@ def detect_language(self, field: str):
             return {"__language": None}
 
     self.dataset = self.dataset.map(detect_)
+    logger.info(
+        f"Detected language in field {field}, added language metadata to '__language'."
+    )
     return self
 
 
@@ -120,6 +123,9 @@ def calc_perplexity(self, field: str):
             return {"__perplexity": None}
 
     self.dataset = self.dataset.map(calc_)
+    logger.info(
+        f"Calculated perplexity-per-byte in field {field}, added perplexity metadata to '__perplexity'."
+    )
     return self
 
 
@@ -149,7 +155,9 @@ def detect_pii(self, fields: Sequence[str]):
         }
 
     self.dataset = self.dataset.map(detect_)
-
+    logger.info(
+        f"Detected PII in fields: {fields}; added __pii__email, __pii__phone, __pii__credential, and __pii__any metadata."
+    )
     # no option to do out-of-place as this operation is not destructive
     return self
 
@@ -174,7 +182,9 @@ def count_tokens(self, fields: Sequence[str], tokenizer: Optional[str] = None):
             f"{field_name}{field}": count_fn(x[field]) for field in fields
         }
     )
-    logger.info(f"Counted tokens in fields: {fields}")
+    logger.info(
+        f"Counted tokens in fields: {fields}, added metadata to {field_name}"
+    )
 
     # no option to do out-of-place as this operation is not destructive
     return self

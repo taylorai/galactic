@@ -120,6 +120,11 @@ def get_embedding_model(self, backend: str = "auto"):
             logger.info(
                 f"Dataset already contains __embedding field. Initializing to use {backend} backend for queries."
             )
+        else:
+            backend = "cpu"
+            logger.info(
+                f"Dataset does not contain __embedding field. Initializing to use {backend} backend for queries."
+            )
 
     if backend == "cpu":
         model_path = hf_hub_download(
@@ -148,7 +153,8 @@ def get_embedding_model(self, backend: str = "auto"):
 
 def get_embeddings(self, field: str, backend: str = "auto"):
     self.get_embedding_model(backend=backend)
-
+    if backend == "auto":
+        backend = "cpu"
     if backend == "openai":
         embs = embed_texts_with_openai(
             self.dataset[field], self.openai_api_key
@@ -177,9 +183,9 @@ def get_nearest_neighbors(self, query: Union[str, np.ndarray], k: int = 5):
     if isinstance(query, str):
         query = self.model(query)
     scores = np.dot(self.emb_matrix, query)
-    top_k = np.argsort(scores)[::-1][:k]
-    df = pd.DataFrame.from_records(self.dataset[top_k])
-    return df.drop(columns=["__embedding"])
+    top_k = list(np.argsort(scores)[::-1][:k])
+    top_k_items = self.dataset.select(top_k)
+    return top_k_items.to_list()
 
 
 # finetune embeddings as in https://github.com/openai/openai-cookbook/blob/main/examples/Customizing_embeddings.ipynb

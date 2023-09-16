@@ -121,7 +121,7 @@ def semdedup(
 
     # get duplicates
     remove = []
-    for cluster_id in range(self.n_clusters):
+    for cluster_id in self.cluster_ids:
         cluster = self.dataset.filter(lambda x: x["__cluster"] == cluster_id)
         if len(cluster) < 2:
             continue

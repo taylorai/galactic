@@ -3,6 +3,7 @@ from typing import Optional, Callable
 import datasets
 import json
 import pybloom_live
+import pandas as pd
 from .utils import (
     read_csv,
 )
@@ -24,9 +25,9 @@ def from_jsonl(cls, path, **kwargs):
     return cls(dataset)
 
 
-def from_parquet(cls, path, **kwargs):
-    dataset = datasets.load_dataset("parquet", data_files=path, **kwargs)
-    return cls(dataset)
+def from_parquet(cls, path):
+    df = pd.read_parquet(path)
+    return cls.from_pandas(df)
 
 
 def from_pandas(cls, df, **kwargs):
@@ -89,7 +90,7 @@ def from_hugging_face_stream(
     return cls(datasets.Dataset.from_list(samples))
 
 
-# save dataset as parquet
+# save dataset as jsonl
 def save(self, path: str, overwrite: bool = False) -> None:
     # check if exists
     if os.path.exists(path) and not overwrite:
@@ -97,7 +98,7 @@ def save(self, path: str, overwrite: bool = False) -> None:
             f"Path {path} already exists. Use overwrite=True to overwrite."
         )
     # save
-    pq.write_table(self.dataset.data.table, path)
-    logger.info(
-        f"Saved dataset as Parquet file to {path}. You can load it with GalacticDataset.from_parquet('{path}')."
-    )
+    with open(path, "wb") as f:
+        for sample in self.dataset:
+            f.write(json.dumps(sample).encode("utf-8"))
+            f.write("\n".encode("utf-8"))
