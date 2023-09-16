@@ -22,6 +22,7 @@ from .taggers import (
 )
 from .transforms import (
     trim_whitespace,
+    ai_column,
 )
 from .embedding import (
     get_embeddings,
@@ -57,6 +58,7 @@ GalacticDataset.calc_perplexity = calc_perplexity
 
 # attach transforms to the class
 GalacticDataset.trim_whitespace = trim_whitespace
+GalacticDataset.ai_column = ai_column
 
 # attach embedding to the class
 GalacticDataset.get_embeddings = get_embeddings

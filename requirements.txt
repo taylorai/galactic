@@ -21,3 +21,4 @@ openai
 networkx
 scikit-learn
 pyarrow
+jinja2

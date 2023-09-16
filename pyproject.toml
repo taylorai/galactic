@@ -11,7 +11,7 @@ description = "Curate, annotate, and clean massive unstructured text datasets fo
 readme = "README.md"
 requires-python = ">=3.7"
 keywords = []
-license = {text = "ELv2"}
+license = {text = "Apache 2.0"}
 classifiers = []
 dependencies = [
     "colorama",
@@ -30,7 +30,8 @@ dependencies = [
     "fasttext",
     "pyarrow",
     "openai",
-    "tiktoken"
+    "tiktoken",
+    "jinja2"
 ]
 
 [tool.black]

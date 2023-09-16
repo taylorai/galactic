@@ -49,7 +49,7 @@ def from_hugging_face_stream(
     path: str,
     split: str,
     config_name: Optional[str] = None,
-    filters=list[Callable[[dict], bool]],
+    filters: list[Callable[[dict], bool]] = None,
     dedup_fields: Optional[list[str]] = None,
     max_samples: Optional[int] = 200000,
     **kwargs,

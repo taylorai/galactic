@@ -8,10 +8,12 @@ import time
 import tiktoken
 from tqdm.auto import tqdm
 from dataclasses import dataclass, field
+from typing import Optional
 
 logger = logging.getLogger("galactic")
 
-API_URL = "https://api.openai.com/v1/embeddings"
+EMBEDDING_URL = "https://api.openai.com/v1/embeddings"
+CHAT_URL = "https://api.openai.com/v1/chat/completions"
 
 
 @dataclass
@@ -22,23 +24,49 @@ class StatusTracker:
     num_tasks_failed: int = 0
     num_rate_limit_errors: int = 0
     time_of_last_rate_limit_error: int = 0
+    total_requests = 0
 
 
 @dataclass
 class APIRequest:
     task_id: int
+    type: str  # either embedding or chat
     text: str
     attempts_left: int
+    system_prompt: Optional[str] = None
     result: list = field(default_factory=list)
 
     def __post_init__(self):
+        # this is the same either way
         tokens = tiktoken.get_encoding("cl100k_base").encode(self.text)
         self.num_tokens = len(tokens)
-        if len(tokens) > 8191:
-            num_chunks = int(np.ceil(len(tokens) / 8191))
-            self.input = np.array_split(tokens, num_chunks).tolist()
-        else:
-            self.input = [tokens]
+
+        # get the URL and request JSON
+        self.url = EMBEDDING_URL if self.type == "embedding" else CHAT_URL
+        self.request_json = {}
+
+        if self.type == "embedding":
+            self.request_json["model"] = "text-embedding-ada-002"
+            if len(tokens) > 8191:
+                num_chunks = int(np.ceil(len(tokens) / 8191))
+                self.request_json["input"] = np.array_split(
+                    tokens, num_chunks
+                ).tolist()
+            else:
+                self.request_json["input"] = [tokens]
+        elif self.type == "chat":
+            self.request_json["model"] = (
+                "gpt-3.5-turbo"
+                if self.num_tokens < 4000
+                else "gpt-3.5-turbo-16k"
+            )
+            messages = []
+            if self.system_prompt is not None:
+                messages.append(
+                    {"content": self.system_prompt, "role": "system"}
+                )
+            messages.append({"content": self.text, "role": "user"})
+            self.request_json["messages"] = messages
 
     async def call_api(
         self,
@@ -47,20 +75,22 @@ class APIRequest:
         status_tracker: StatusTracker,
         pbar: tqdm,
     ):
-        request_json = {
-            "model": "text-embedding-ada-002",
-            "input": self.input,
-        }
         try:
+            status_tracker.total_requests += 1
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    url=API_URL, headers=request_header, json=request_json
+                    url=self.url,
+                    headers=request_header,
+                    json=self.request_json,
                 ) as response:
                     response = await response.json()
             if "error" in response:
                 if "Rate limit" in response["error"].get("message", ""):
                     status_tracker.time_of_last_rate_limit_error = time.time()
                     status_tracker.num_rate_limit_errors += 1
+                if "context length" in response["error"].get("message", ""):
+                    print("context length exceeded, retrying won't help")
+                    self.attempts_left = 0
                 self.result.append(response)
                 if self.attempts_left:
                     print("adding to retry queue")
@@ -86,9 +116,14 @@ class APIRequest:
 
 async def process_api_requests_from_list(
     texts: list[str],
+    type: str,
     api_key: str,
     max_attempts: int,
+    system_prompt: Optional[str] = None,
 ):
+    if type not in ["embedding", "chat"]:
+        raise ValueError("type must be either 'embedding' or 'chat'")
+
     """Processes API requests in parallel, throttling to stay under rate limits."""
     # constants
     seconds_to_pause_after_rate_limit_error = 15
@@ -107,10 +142,10 @@ async def process_api_requests_from_list(
     next_request = None  # variable to hold the next request to call
 
     # initialize available capacity counts
-    max_requests_per_minute = 3500
-    max_tokens_per_minute = 350_000
-    available_request_capacity = 3500
-    available_token_capacity = 350_000
+    max_requests_per_minute = 3500 if type == "embedding" else 2000
+    max_tokens_per_minute = 350_000 if type == "embedding" else 90_000
+    available_request_capacity = max_requests_per_minute
+    available_token_capacity = max_tokens_per_minute
     last_update_time = time.time()
 
     # initialize flags
@@ -135,8 +170,10 @@ async def process_api_requests_from_list(
                     idx, text = next(texts)
                     next_request = APIRequest(
                         task_id=idx,
+                        type=type,
                         text=text,
                         attempts_left=max_attempts,
+                        system_prompt=system_prompt,
                     )
                     status_tracker.num_tasks_started += 1
                     status_tracker.num_tasks_in_progress += 1
@@ -234,6 +271,7 @@ def embed_texts_with_openai(
     results = asyncio.run(
         process_api_requests_from_list(
             texts=texts,
+            type="embedding",
             api_key=api_key,
             max_attempts=max_attempts,
         )
@@ -249,3 +287,30 @@ def embed_texts_with_openai(
             avg = np.mean(arr, axis=0)
             embs.append((avg / np.linalg.norm(avg)).tolist())
     return embs
+
+
+def run_chat_queries_with_openai(
+    queries: list[str],
+    api_key: str,
+    system_prompt: Optional[str] = None,
+    max_attempts: int = 10,
+):
+    results = asyncio.run(
+        process_api_requests_from_list(
+            texts=queries,
+            type="chat",
+            api_key=api_key,
+            max_attempts=max_attempts,
+            system_prompt=system_prompt,
+        )
+    )
+    # extract the replies
+    replies = []
+    for result in sorted(results, key=lambda x: x.task_id):
+        if "error" in result.result[-1].keys():
+            replies.append(None)
+        else:
+            replies.append(
+                result.result[-1]["choices"][0]["message"]["content"]
+            )
+    return replies
