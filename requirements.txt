@@ -3,12 +3,11 @@ onnxruntime==1.15.1
 ctranslate2==3.19.0
 scrubadub==2.0.1
 fasttext==0.9.2
-re
 datasets
 json
 pandas
 numpy
-tqdm.auto
+tqdm
 typing
 embedding
 threading
@@ -18,3 +17,7 @@ sklearn.cluster
 transformers
 colorama
 tiktoken
+openai
+networkx
+scikit-learn
+pyarrow
