@@ -34,6 +34,8 @@ class APIRequest:
     text: str
     attempts_left: int
     system_prompt: Optional[str] = None
+    logit_bias: Optional[dict[str, float]] = None
+    max_new_tokens: Optional[int] = None
     result: list = field(default_factory=list)
 
     def __post_init__(self):
@@ -46,6 +48,10 @@ class APIRequest:
         self.request_json = {}
 
         if self.type == "embedding":
+            if self.logit_bias is not None or self.max_new_tokens is not None:
+                raise NotImplementedError(
+                    "Logit bias / max tokens doesn't apply to embeddings."
+                )
             self.request_json["model"] = "text-embedding-ada-002"
             if len(tokens) > 8191:
                 num_chunks = int(np.ceil(len(tokens) / 8191))
@@ -67,6 +73,10 @@ class APIRequest:
                 )
             messages.append({"content": self.text, "role": "user"})
             self.request_json["messages"] = messages
+            if self.logit_bias is not None:
+                self.request_json["logit_bias"] = self.logit_bias
+            if self.max_new_tokens is not None:
+                self.request_json["max_tokens"] = self.max_new_tokens
 
     async def call_api(
         self,
@@ -121,6 +131,8 @@ async def process_api_requests_from_list(
     api_key: str,
     max_attempts: int,
     system_prompt: Optional[str] = None,
+    logit_bias: Optional[dict[str, float]] = None,
+    max_new_tokens: Optional[int] = None,
     max_tokens_per_minute: int = 90_000,
     max_requests_per_minute: int = 2000,
 ):
@@ -175,6 +187,8 @@ async def process_api_requests_from_list(
                         text=text,
                         attempts_left=max_attempts,
                         system_prompt=system_prompt,
+                        logit_bias=logit_bias,
+                        max_new_tokens=max_new_tokens,
                     )
                     status_tracker.num_tasks_started += 1
                     status_tracker.num_tasks_in_progress += 1
@@ -300,6 +314,8 @@ def run_chat_queries_with_openai(
     queries: list[str],
     api_key: str,
     system_prompt: Optional[str] = None,
+    logit_bias: Optional[dict[str, float]] = None,
+    max_new_tokens: Optional[int] = None,
     max_attempts: int = 10,
     max_tokens_per_minute: int = 90_000,
     max_requests_per_minute: int = 2000,
@@ -311,6 +327,8 @@ def run_chat_queries_with_openai(
             api_key=api_key,
             max_attempts=max_attempts,
             system_prompt=system_prompt,
+            logit_bias=logit_bias,
+            max_new_tokens=max_new_tokens,
             max_requests_per_minute=max_requests_per_minute,
             max_tokens_per_minute=max_tokens_per_minute,
         )
