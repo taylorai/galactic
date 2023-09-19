@@ -7,7 +7,7 @@
         <img alt="Slack" src="https://img.shields.io/badge/Join-important.svg?color=ed2dd0&label=Slack&logo=slack" />
     </a>
         <a href="https://trytaylor.ai/">
-        <img alt="Website" src=https://img.shields.io/badge/Site-trytaylor.ai-ed2dd0?link=https%3A%2F%2Ftrytaylor.ai" />
+        <img alt="Website" src="https://img.shields.io/badge/Site-trytaylor.ai-ed2dd0?link=https%3A%2F%2Ftrytaylor.ai"/>
     </a>
     <a href="https://github.com/taylorai/galactic/blob/main/LICENSE">
           <img alt="License Apache 2.0" src="https://img.shields.io/badge/License-Apache 2.0-blue.svg?style=flat&color=ed2dd0" height="20" width="auto">
