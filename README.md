@@ -2,11 +2,28 @@
 
 ![jpg](galactic.jpeg)
 
+<p align="center">
+    <a href="https://galactic-ai.slack.com/">
+        <img alt="Slack" src="https://img.shields.io/badge/Join-important.svg?color=ed2dd0&label=Slack&logo=slack" />
+    </a>
+        <a href="https://trytaylor.ai/">
+        <img alt="Website" src="https://img.shields.io/badge/Site-trytaylor.ai-ed2dd0?link=https%3A%2F%2Ftrytaylor.ai"/>
+    </a>
+    <a href="https://github.com/taylorai/galactic/blob/main/LICENSE">
+          <img alt="License Apache 2.0" src="https://img.shields.io/badge/License-Apache 2.0-blue.svg?style=flat&color=ed2dd0" height="20" width="auto">
+    </a>
+    <br/>
+    <a href="https://github.com/taylorai/galactic">
+    <img src="https://img.shields.io/github/stars/taylorai/galactic?style=social" />
+    </a>
+    <a href="https://twitter.com/intent/follow?screen_name=TryTaylor_AI">
+        <img src="https://img.shields.io/twitter/follow/TryTaylor_AI?style=social" alt="Follow on Twitter" />
+    </a>
+</p>
+
 Galactic provides cleaning and curation tools for massive unstructured text datasets. It's designed to help you curate fine-tuning datasets, create document collections for retrieval-augmented generation (RAG), and even perform deduplication of web-scale datasets for LLM pre-training. This README provides a non-exhaustive overview of what Galactic can do; for more details, check out the [API reference](https://github.com/taylorai/galactic/blob/main/API_REFERENCE.md).
 
 Galactic is made available under the Apache 2.0 license.
-
-
 
 ## Getting Started
 To get started, install the package (`pip install galactic-ai`) and import it:
