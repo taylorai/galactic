@@ -12,8 +12,9 @@
     <a href="https://github.com/taylorai/galactic/blob/main/LICENSE">
           <img alt="License Apache 2.0" src="https://img.shields.io/badge/License-Apache 2.0-blue.svg?style=flat&color=ed2dd0" height="20" width="auto">
     </a>
+    <br/>
     <a href="https://github.com/taylorai/galactic">
-    <img src="https://img.shields.io/github/stars/taylorai/galactic?color=ed2dd0" />
+    <img src="https://img.shields.io/github/stars/taylorai/galactic?style=social" />
     </a>
     <a href="https://twitter.com/intent/follow?screen_name=TryTaylor_AI">
         <img src="https://img.shields.io/twitter/follow/TryTaylor_AI?style=social" alt="Follow on Twitter" />
