@@ -1,0 +1,37 @@
+import pytest
+from galactic import GalacticDataset
+import json
+
+class GalacticDataset:
+    def __init__(self, data=None):
+        self.data = data if data else []
+
+    def load_file_format(self, filename, file_format="jsonl"):
+        if file_format == "jsonl":
+            with open(filename, 'r') as f:
+                self.data = [json.loads(line) for line in f.readlines()]
+
+# Tests
+def test_init():
+    dataset = GalacticDataset()
+    assert dataset.data == []
+
+    sample_data = [{"content": "Apple"}, {"content": "Orange"}]
+    dataset_with_data = GalacticDataset(data=sample_data)
+    assert dataset_with_data.data == sample_data
+
+def test_load_file_format():
+    # Creating a JSONL file
+    sample_data = [{"content": "Apple"}, {"content": "Orange"}]
+    with open("test_file.jsonl", "w") as f:
+        for item in sample_data:
+            f.write(json.dumps(item) + "\n")
+
+    dataset = GalacticDataset()
+    dataset.load_file_format("test_file.jsonl", file_format="jsonl")
+
+    assert dataset.data == sample_data
+
+# Removing the JSONL file
+import os
+os.remove("test_file.jsonl")

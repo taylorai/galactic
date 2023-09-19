@@ -22,3 +22,4 @@ networkx
 scikit-learn
 pyarrow
 jinja2
+pytest

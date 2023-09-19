@@ -1,0 +1,17 @@
+import pytest
+from galactic import GalacticDataset
+
+def test_filter_string():
+    data = [
+        {"content": "Apple is tasty", "url": "http://apple.blogspot.com"},
+        {"content": "Orange is yummy", "url": "http://orange.com"},
+        {"content": "Banana is good", "url": "http://banana.blogspot.com"}
+    ]
+    dataset = GalacticDataset(data)
+    
+    # Filter out entries with 'blogspot' in the URL
+    dataset = dataset.filter_string(fields=["url"], values=["blogspot"])
+    
+    # There should only be one entry left after filtering
+    assert len(dataset) == 1
+    assert dataset[0]["content"] == "Orange is juicy"

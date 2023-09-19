@@ -1,0 +1,33 @@
+import pytest
+from transformers import GPT2Tokenizer
+from galactic import GalacticDataset
+
+class GalacticDataset:
+    def __init__(self, data):
+        self.data = data
+        self.tokenizers = {
+            "gpt2": GPT2Tokenizer.from_pretrained("gpt2")
+        }
+
+    def count_tokens(self, fields, tokenizer="gpt2"):
+        for item in self.data:
+            for field in fields:
+                tokens = self.tokenizers[tokenizer].tokenize(item[field])
+                item[f"__token_count__{field}"] = len(tokens)
+
+def test_count_tokens_with_gpt2():
+    data = [
+        {"content": "Apple is tasty"},
+        {"content": "Orange is juicy and sour"},
+        {"content": "Banana is good"}
+    ]
+    dataset = GalacticDataset(data)
+
+    # Count tokens using GPT-2 tokenizer
+    dataset.count_tokens(fields=["content"], tokenizer="gpt2")
+
+    for item in dataset.data:
+        assert 0 < item["__token_count__content"] <= len(item["content"].split())
+
+# Run the test
+test_count_tokens_with_gpt2()
