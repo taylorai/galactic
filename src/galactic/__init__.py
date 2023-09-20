@@ -31,6 +31,7 @@ from .embedding import (
 )
 from .cluster import cluster, remove_cluster, get_cluster_info
 from .semdedup import semdedup
+from .extract_doc import extract_doc
 
 
 # attach loaders to the class
@@ -73,3 +74,6 @@ GalacticDataset.get_cluster_info = get_cluster_info
 
 # attach semantic deduplication to the class
 GalacticDataset.semdedup = semdedup
+
+# attach doc extraction to the class
+GalacticDataset.extract_doc = extract_doc
