@@ -21,6 +21,8 @@ class GalacticDataset:
     cluster_ids: Optional[Sequence[int]] = None
     cluster_centers: Optional[dict[int, np.ndarray]] = None
     openai_api_key: Optional[str] = None
+    max_tokens_per_minute: Optional[int] = 100000
+    max_requests_per_minute: Optional[int] = 2000
 
     def __post_init__(self):
         # add unique increaing int __id field if it doesn't already exist
@@ -85,3 +87,12 @@ class GalacticDataset:
                 )
 
             return wrapper
+
+    def set_openai_key(self, key):
+        self.openai_api_key = key
+
+    def set_rate_limits(self, **kwargs):
+        if "max_tokens_per_minute" in kwargs:
+            self.max_tokens_per_minute = kwargs["max_tokens_per_minute"]
+        if "max_requests_per_minute" in kwargs:
+            self.max_requests_per_minute = kwargs["max_requests_per_minute"]

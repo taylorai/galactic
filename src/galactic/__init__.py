@@ -20,6 +20,7 @@ from .taggers import (
     detect_seo_spam,
     count_tokens,
     calc_perplexity,
+    ai_tagger,
 )
 from .transforms import trim_whitespace, ai_column, ai_classifier
 from .embedding import (
@@ -55,6 +56,7 @@ GalacticDataset.detect_pii = detect_pii
 GalacticDataset.count_tokens = count_tokens
 GalacticDataset.calc_perplexity = calc_perplexity
 GalacticDataset.detect_seo_spam = detect_seo_spam
+GalacticDataset.ai_tagger = ai_tagger
 
 # attach transforms to the class
 GalacticDataset.trim_whitespace = trim_whitespace

@@ -163,6 +163,9 @@ def ai_classifier(
         classes (List[str] or dict[str, str]): Classes to classify into. Can be just a list of labels, or a dict of label: description.
         If provided, descriptions will be used for a) prompting API model if backend = 'openai', b) embedding if backend = "embeddings",
         c) zero-shot classification if backend = "huggingface".
+        prompt (str): Prompt template (Jinja2) to use for the API request, with a template slot for the field to classify.
+        Only used if backend = 'openai'. If none provided, a basic default prompt will be used.
+        default prompt will be used.
         backend (str): Which backend to use. Currently supports 'embeddings', 'openai' and 'huggingface'.
     """
     if backend == "embeddings":

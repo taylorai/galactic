@@ -2,7 +2,6 @@
 import aiohttp
 import numpy as np
 import asyncio
-import json
 import logging
 import time
 import tiktoken
@@ -104,7 +103,6 @@ class APIRequest:
                     self.attempts_left = 0
                 self.result.append(response)
                 if self.attempts_left:
-                    print("adding to retry queue")
                     self.attempts_left -= 1
                     retry_queue.put_nowait(self)
                 else:

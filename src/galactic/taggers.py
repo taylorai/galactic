@@ -1,12 +1,17 @@
+import os
 import re
 import pathlib
-from typing import Sequence, Callable, Optional
+from typing import Sequence, Optional, Union
 import numpy as np
 import huggingface_hub
 from transformers import AutoTokenizer
 import scrubadub
-from .kenlm import KenlmModel
+import tiktoken
+import jinja2
+import time
+
 from .utils import byte_len
+from .async_openai import run_chat_queries_with_openai
 
 import logging
 
@@ -132,6 +137,12 @@ def calc_perplexity(
             return {"__perplexity": ppl}
 
     elif model == "kenlm":
+        try:
+            from .kenlm import KenlmModel
+        except ImportError:
+            raise ImportError(
+                "KenLM is not installed. Install with 'pip install https://github.com/kpu/kenlm/archive/master.zip'."
+            )
         if language is None or dataset is None:
             raise ValueError(
                 "Must specify language (e.g. 'en') and dataset (e.g. 'wikipedia') for KenLM. See options here: https://huggingface.co/edugp/kenlm/tree/main"
@@ -256,4 +267,104 @@ def count_tokens(self, fields: Sequence[str], tokenizer: Optional[str] = None):
     )
 
     # no option to do out-of-place as this operation is not destructive
+    return self
+
+
+def ai_tagger(
+    self,
+    field: str,
+    tags: Union[list[str], dict[str, str]],
+    prompt: Optional[str] = None,
+    backend="openai",
+    allow_not_sure: bool = False,
+):
+    """
+    Use OpenAI's API or a HF zero-shot classifier to generate a new column based on an existing column.
+    Args:
+        name (str): Name of the new column.
+        field (str): Name of the field to use for classification. Can be None if backend is 'embeddings'.
+        classes (List[str] or dict[str, str]): Classes to classify into. Can be just a list of labels, or a dict of label: description.
+        If provided, descriptions will be used for a) prompting API model if backend = 'openai', b) embedding if backend = "embeddings",
+        c) zero-shot classification if backend = "huggingface".
+        backend (str): Which backend to use. Currently supports 'embeddings', 'openai' and 'huggingface'.
+    """
+    if backend != "openai":
+        raise NotImplementedError(
+            "Only OpenAI API is currently supported for AI tagging."
+        )
+
+    elif backend == "openai":
+        if self.openai_api_key is None:
+            self.openai_api_key = os.environ.get("OPENAI_API_KEY", None)
+            if self.openai_api_key is None:
+                raise ValueError(
+                    "No OpenAI API key found. Set OPENAI_API_KEY environment variable, or set the openai_api_key attribute of the GalacticDataset."
+                )
+        # make sure field exists
+        if field not in self.dataset.column_names:
+            raise ValueError(f"Field {field} not found in dataset.")
+
+        # create logit bias (same for each tag) -- model can only output True or False
+        token2cls = {}
+        tokenizer = tiktoken.encoding_for_model("gpt-3.5-turbo")
+        classes = ["True", "False"]
+        if allow_not_sure:
+            classes.append("Not sure")
+        for cls in classes:
+            t1 = tokenizer.encode(cls)[0]
+            t2 = tokenizer.encode(" " + cls)[0]
+            if t1 in token2cls or t2 in token2cls:
+                raise ValueError(
+                    "Class names must not share a prefix for logit bias trick to work. Try changing the labels and see if that helps."
+                )
+            else:
+                token2cls[t1] = cls
+                token2cls[t2] = cls
+        logit_bias = {t: 100 for t in token2cls.keys()}
+
+        for tag in tags:
+            logger.info(f"Tagging with tag {tag}...")
+            # construct prompt template
+            if prompt is None:
+                prompt = f"Tag the provided text with the following tag:\n"
+                if isinstance(tags, list):
+                    prompt += f"  - {tag}\n"
+                else:
+                    prompt += f"  - {tag}: {tags[tag]}\n"
+                prompt += "Answer True if the tag applies to the text, and False if it does not. "
+                if allow_not_sure:
+                    prompt += "If you're not sure, answer Not sure."
+                prompt += (
+                    "\n\n---\n\nText: {{"
+                    + field
+                    + "}}\n\n---\n\nDoes the tag apply?"
+                )
+            template = jinja2.Template(prompt)
+            prompts = self.dataset.select_columns([field]).map(
+                lambda sample: {"__prompt": template.render(**sample)}
+            )["__prompt"]
+            logger.info(f"Example prompt for tag {tag}: {prompts[0]}")
+
+            responses = run_chat_queries_with_openai(
+                queries=prompts,
+                api_key=self.openai_api_key,
+                logit_bias=logit_bias,
+                max_new_tokens=1,
+                max_requests_per_minute=self.max_requests_per_minute,
+                max_tokens_per_minute=self.max_tokens_per_minute,
+            )
+
+            # map back to labels
+            first_tokens = [
+                tokenizer.encode(response) for response in responses
+            ]
+            labels = [token2cls[t[0]] for t in first_tokens]
+            self.dataset = self.dataset.add_column(
+                name=f"__ai_tag__{tag.replace(' ', '_')}", column=labels
+            )
+            logger.info(
+                f"Tagged with tag {tag}. Pausing to cool down before issuing more requests..."
+            )
+            time.sleep(30)
+
     return self
