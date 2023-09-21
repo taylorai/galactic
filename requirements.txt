@@ -22,3 +22,6 @@ networkx
 scikit-learn
 pyarrow
 jinja2
+pytest
+pytesseract
+pdf2image

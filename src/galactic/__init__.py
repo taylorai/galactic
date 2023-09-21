@@ -29,8 +29,8 @@ from .embedding import (
 )
 from .cluster import cluster, remove_cluster, get_cluster_info
 from .semdedup import semdedup
-from .minhash_lsh import compute_minhashes
 
+from .minhash_lsh import compute_minhashes
 
 # attach loaders to the class
 GalacticDataset.from_csv = classmethod(from_csv)

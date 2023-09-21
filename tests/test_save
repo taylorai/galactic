@@ -1,0 +1,13 @@
+from unittest.mock import mock_open, patch
+from galactic import Dataset
+
+def test_dataset_save():
+    m = mock_open()
+    with patch('builtins.open', m):
+        dataset = Dataset()  
+
+        # Call the save method
+        dataset.save("my_dataset.jsonl")
+
+        # Ensure the file was written with the correct name
+        m.assert_called_once_with("my_dataset.jsonl", 'w')
