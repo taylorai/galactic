@@ -5,6 +5,7 @@ import numpy as np
 import huggingface_hub
 from transformers import AutoTokenizer
 import scrubadub
+from .kenlm import KenlmModel
 from .utils import byte_len
 
 import logging
@@ -68,6 +69,9 @@ def tag_regex(self, fields: Sequence[str], regex: str, tag: str):
 
 
 def detect_language(self, field: str):
+    # make sure field exists
+    if field not in self.dataset.features:
+        raise ValueError(f"Field {field} not found in dataset.")
     import fasttext
 
     model_path = huggingface_hub.hf_hub_download(
@@ -76,21 +80,18 @@ def detect_language(self, field: str):
     model = fasttext.load_model(model_path)
 
     def detect_(sample):
-        if field in sample:
-            if isinstance(sample[field], str):
-                return {
-                    "__language": model.predict(
-                        sample[field].replace("\n", " ")
-                    )[0][0].split("__label__")[1]
-                }
-            else:
-                return {
-                    "__language": model.predict(str(sample[field]))[0][
-                        0
-                    ].split("__label__")[1]
-                }
+        if isinstance(sample[field], str):
+            return {
+                "__language": model.predict(sample[field].replace("\n", " "))[
+                    0
+                ][0].split("__label__")[1]
+            }
         else:
-            return {"__language": None}
+            return {
+                "__language": model.predict(str(sample[field]))[0][0].split(
+                    "__label__"
+                )[1]
+            }
 
     self.dataset = self.dataset.map(detect_)
     logger.info(
@@ -99,28 +100,52 @@ def detect_language(self, field: str):
     return self
 
 
-def calc_perplexity(self, field: str):
-    import ctranslate2
+def calc_perplexity(
+    self,
+    field: str,
+    model: str = "kenlm",  # other option is pythia
+    language: Optional[str] = "en",
+    dataset: Optional[str] = "wikipedia",
+):
+    # make sure field exists and is a string field
+    if field not in self.dataset.features:
+        raise ValueError(f"Field {field} not found in dataset.")
+    elif self.dataset.features[field].dtype != "string":
+        raise ValueError(
+            f"Field {field} is not a string field, and so can't be used to calculate perplexity."
+        )
+    if model == "pythia":
+        import ctranslate2
 
-    repo_path = huggingface_hub.snapshot_download(
-        "TaylorAI/galactic-models", allow_patterns="p70/*"
-    )
-    model_path = pathlib.Path(repo_path) / "p70"
-    model = ctranslate2.Generator(str(model_path))
-    tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m")
+        repo_path = huggingface_hub.snapshot_download(
+            "TaylorAI/galactic-models", allow_patterns="p70/*"
+        )
+        model_path = pathlib.Path(repo_path) / "p70"
+        model = ctranslate2.Generator(str(model_path))
+        tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m")
 
-    def calc_(sample):
-        if field in sample:
-            if isinstance(sample[field], str):
-                token_ids = tokenizer(sample[field]).input_ids
-                tokens = tokenizer.convert_ids_to_tokens(token_ids)
-                log_probs = model.score_batch([tokens])[0].log_probs
-                ppl = np.exp(-np.sum(log_probs) / byte_len(sample[field]))
-                return {"__perplexity": ppl}
-            else:
-                return {"__perplexity": None}
-        else:
-            return {"__perplexity": None}
+        def calc_(sample):
+            token_ids = tokenizer(sample[field]).input_ids
+            tokens = tokenizer.convert_ids_to_tokens(token_ids)
+            log_probs = model.score_batch([tokens])[0].log_probs
+            ppl = np.exp(-np.sum(log_probs) / byte_len(sample[field]))
+            return {"__perplexity": ppl}
+
+    elif model == "kenlm":
+        if language is None or dataset is None:
+            raise ValueError(
+                "Must specify language (e.g. 'en') and dataset (e.g. 'wikipedia') for KenLM. See options here: https://huggingface.co/edugp/kenlm/tree/main"
+            )
+        model = KenlmModel.from_pretrained(dataset, language)
+
+        def calc_(sample):
+            ppl = model.get_perplexity(sample[field])
+            return {"__perplexity": ppl}
+
+    else:
+        raise ValueError(
+            f"Model {model} not supported. Supported models: 'kenlm', 'pythia'."
+        )
 
     self.dataset = self.dataset.map(calc_)
     logger.info(
@@ -157,6 +182,50 @@ def detect_pii(self, fields: Sequence[str]):
     self.dataset = self.dataset.map(detect_)
     logger.info(
         f"Detected PII in fields: {fields}; added __pii__email, __pii__phone, __pii__credential, and __pii__any metadata."
+    )
+    # no option to do out-of-place as this operation is not destructive
+    return self
+
+
+def detect_seo_spam(self, field: str):
+    """
+    Uses a FastText model distilled from GPT-3.5-turbo to flag documents likely to be SEO spam or otherwise
+    repetitive, machine-generated, or worthless. Trained on web documents from Falcon RefinedWeb, unlikely to
+    perform well out-of-distribution. Preprocessing is built-in, we just lowercase -> replace \n with space.
+    """
+    # make sure field exists in dataset and are strings
+    if field not in self.dataset.features:
+        raise ValueError(f"Field {field} not found in dataset.")
+    elif self.dataset.features[field].dtype != "string":
+        raise ValueError(
+            f"Field {field} is not a string field, and so can't be used to detect SEO spam."
+        )
+
+    import fasttext
+
+    model_path = huggingface_hub.hf_hub_download(
+        repo_id="TaylorAI/galactic-models", filename="seo_spam.ftz"
+    )
+    model = fasttext.load_model(model_path)
+
+    def detect_(sample):
+        result = model.predict(
+            sample[field].replace("\n", " ").lower()
+        )  # [0][0].split("__label__")[1]
+        label, prob = result[0][0].split("__label__")[1], result[1][0]
+        if label == "discard":
+            return {
+                f"__seo_spam__{field}": True,
+                f"__seo_spam_prob__{field}": prob,
+            }
+        return {
+            f"__seo_spam__{field}": False,
+            f"__seo_spam_prob__{field}": 1 - prob,
+        }
+
+    self.dataset = self.dataset.map(detect_)
+    logger.info(
+        f"Detected SEO spam in fields '{field}'; added __seo_spam metadata."
     )
     # no option to do out-of-place as this operation is not destructive
     return self

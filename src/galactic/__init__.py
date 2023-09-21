@@ -17,13 +17,11 @@ from .taggers import (
     tag_regex,
     detect_language,
     detect_pii,
+    detect_seo_spam,
     count_tokens,
     calc_perplexity,
 )
-from .transforms import (
-    trim_whitespace,
-    ai_column,
-)
+from .transforms import trim_whitespace, ai_column, ai_classifier
 from .embedding import (
     get_embeddings,
     get_nearest_neighbors,
@@ -31,8 +29,8 @@ from .embedding import (
 )
 from .cluster import cluster, remove_cluster, get_cluster_info
 from .semdedup import semdedup
-from .extract_doc import extract_doc
 
+from .minhash_lsh import compute_minhashes
 
 # attach loaders to the class
 GalacticDataset.from_csv = classmethod(from_csv)
@@ -56,10 +54,12 @@ GalacticDataset.detect_language = detect_language
 GalacticDataset.detect_pii = detect_pii
 GalacticDataset.count_tokens = count_tokens
 GalacticDataset.calc_perplexity = calc_perplexity
+GalacticDataset.detect_seo_spam = detect_seo_spam
 
 # attach transforms to the class
 GalacticDataset.trim_whitespace = trim_whitespace
 GalacticDataset.ai_column = ai_column
+GalacticDataset.ai_classifier = ai_classifier
 
 # attach embedding to the class
 GalacticDataset.get_embeddings = get_embeddings
@@ -71,9 +71,8 @@ GalacticDataset.cluster = cluster
 GalacticDataset.remove_cluster = remove_cluster
 GalacticDataset.get_cluster_info = get_cluster_info
 
-
 # attach semantic deduplication to the class
 GalacticDataset.semdedup = semdedup
 
-# attach doc extraction to the class
-GalacticDataset.extract_doc = extract_doc
+# attach minhash lsh to the class
+GalacticDataset.compute_minhashes = compute_minhashes
