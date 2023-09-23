@@ -34,7 +34,11 @@ dependencies = [
     "jinja2",
     "sentencepiece",
     "aiohttp",
-    "protobuf==3.20.1"
+    "protobuf==3.20.1",
+    "scikit-learn",
+    "joblib",
+    "nest_asyncio"
+
 ]
 
 [tool.black]

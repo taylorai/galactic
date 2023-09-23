@@ -4,6 +4,9 @@ data/
 # models
 models/
 
+# any other local stuff
+local/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

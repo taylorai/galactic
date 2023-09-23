@@ -20,9 +20,9 @@ def from_csv(cls, path: str):
     return cls.from_pandas(df)
 
 
-def from_jsonl(cls, path, **kwargs):
-    dataset = datasets.load_dataset("json", data_files=path, **kwargs)
-    return cls(dataset)
+def from_jsonl(cls, path):
+    df = pd.read_json(path, lines=True, orient="records")
+    return cls.from_pandas(df)
 
 
 def from_parquet(cls, path):

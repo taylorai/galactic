@@ -1,5 +1,6 @@
 # a transform can either modify a column in-place, or add a new column. if the new column is just true/false, it should probably be a "tag".
 import os
+import re
 import numpy as np
 import unicodedata
 from typing import Sequence
@@ -7,6 +8,8 @@ import logging
 import jinja2
 from typing import Optional, Union
 import tiktoken
+import fasttext
+import joblib
 from .async_openai import run_chat_queries_with_openai
 
 logger = logging.getLogger("galactic")
@@ -95,9 +98,8 @@ def ai_column(
     name: str,
     prompt: str,
     depends_on=list[str],
+    normalize: list[str] = ["strip", "lower"],  # must be methods of str class
     system_prompt: Optional[str] = None,
-    max_tokens_per_minute: int = 90_000,
-    max_requests_per_minute: int = 2000,
     inplace: bool = True,
 ):
     """
@@ -111,6 +113,10 @@ def ai_column(
     for field in depends_on:
         if field not in self.dataset.column_names:
             raise ValueError(f"Field {field} not found in dataset.")
+    if name in self.dataset.column_names:
+        raise ValueError(
+            f"Column {name} already exists in dataset. Please choose a different name, or drop the column."
+        )
     if self.openai_api_key is None:
         self.openai_api_key = os.environ.get("OPENAI_API_KEY", None)
         if self.openai_api_key is None:
@@ -126,9 +132,16 @@ def ai_column(
         queries=prompts,
         api_key=self.openai_api_key,
         system_prompt=system_prompt,
-        max_tokens_per_minute=max_tokens_per_minute,
-        max_requests_per_minute=max_requests_per_minute,
+        max_tokens_per_minute=self.max_tokens_per_minute,
+        max_requests_per_minute=self.max_requests_per_minute,
     )
+    # apply normalizations
+    for fn in normalize:
+        try:
+            responses = [getattr(str, fn)(response) for response in responses]
+        except AttributeError:
+            raise ValueError(f"Unknown normalization function: {fn}")
+
     if inplace:
         self.dataset = self.dataset.add_column(name=name, column=responses)
         logger.info(f"Added new column {name} using prompt {prompt}")
@@ -262,6 +275,8 @@ def ai_classifier(
             api_key=self.openai_api_key,
             logit_bias=logit_bias,
             max_new_tokens=1,
+            max_tokens_per_minute=self.max_tokens_per_minute,
+            max_requests_per_minute=self.max_requests_per_minute,
         )
 
         # map back to labels
@@ -292,5 +307,67 @@ def ai_classifier(
         )
     else:
         raise ValueError(f"Unknown backend: {backend}")
+
+    return self
+
+
+def fasttext_classifier(
+    self,
+    new_column: str,
+    model_path: str,
+    field: str,
+    # these should match how the model was trained
+    normalize: list[str] = ["lower", "strip"],
+    split_punctuation: bool = True,
+    replace_newlines_with: str = " __newline__ ",
+):
+    # make sure the input field is a string
+    if self.dataset.features[field].dtype != "string":
+        raise ValueError(f"Field {field} is not a string field.")
+
+    model = fasttext.load_model(model_path)
+
+    def _preprocess(text):
+        for fn in normalize:
+            text = getattr(str, fn)(text)
+        text = text.replace("\n", replace_newlines_with)
+        for n in normalize:
+            if n == "lower":
+                text = text.lower()
+            elif n == "strip":
+                text = text.strip()
+        if split_punctuation:
+            text = re.sub(r"([.!?,\'/()])", r" \1 ", text)
+        return text
+
+    def _classify(sample):
+        input_text = _preprocess(sample[field])
+        output = model.predict(input_text)
+        return {new_column: output[0][0].split("__label__")[1]}
+
+    self.dataset = self.dataset.map(_classify)
+    logger.info(
+        f"Applied classifier to field {field}, added result to {new_column}."
+    )
+    return self
+
+
+def embeddings_classifier(
+    self,
+    new_column: str,
+    model_path: str,
+    field: str = "__embedding",
+):
+    model = joblib.load(model_path + ".joblib")
+    le = joblib.load(model_path + ".labels.joblib")
+
+    def _classify(sample):
+        outputs = le.inverse_transform(model.predict(sample[field]))
+        return {new_column: outputs}
+
+    self.dataset = self.dataset.map(_classify, batched=True)
+    logger.info(
+        f"Applied classifier to field {field}, added result to {new_column}."
+    )
 
     return self

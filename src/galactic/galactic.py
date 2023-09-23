@@ -74,9 +74,15 @@ class GalacticDataset:
         if name in ["column_names", "features", "info"]:
             return getattr(self.dataset, name)
         elif name in ["filter", "map", "select", "shuffle"]:
+            if name == "shuffle":
+                logger.warning(
+                    "Shuffling the dataset can be really expensive! Watch out!"
+                )
 
             def wrapper(*args, **kwargs):
                 result = getattr(self.dataset, name)(*args, **kwargs)
+                if name == "shuffle":
+                    result = result.flatten_indices()
                 return GalacticDataset(
                     dataset=result,
                     model=self.model,

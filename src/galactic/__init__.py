@@ -22,7 +22,13 @@ from .taggers import (
     calc_perplexity,
     ai_tagger,
 )
-from .transforms import trim_whitespace, ai_column, ai_classifier
+from .transforms import (
+    trim_whitespace,
+    ai_column,
+    ai_classifier,
+    fasttext_classifier,
+    embeddings_classifier,
+)
 from .embedding import (
     get_embeddings,
     get_nearest_neighbors,
@@ -32,6 +38,11 @@ from .cluster import cluster, remove_cluster, get_cluster_info
 from .semdedup import semdedup
 
 from .minhash_lsh import compute_minhashes
+
+from .distill import (
+    distill_fasttext,
+    distill_embedding,
+)
 
 # attach loaders to the class
 GalacticDataset.from_csv = classmethod(from_csv)
@@ -62,6 +73,9 @@ GalacticDataset.ai_tagger = ai_tagger
 GalacticDataset.trim_whitespace = trim_whitespace
 GalacticDataset.ai_column = ai_column
 GalacticDataset.ai_classifier = ai_classifier
+GalacticDataset.fasttext_classifier = fasttext_classifier
+GalacticDataset.embeddings_classifier = embeddings_classifier
+
 
 # attach embedding to the class
 GalacticDataset.get_embeddings = get_embeddings
@@ -78,3 +92,8 @@ GalacticDataset.semdedup = semdedup
 
 # attach minhash lsh to the class
 GalacticDataset.compute_minhashes = compute_minhashes
+
+
+# attach distillation tools to the class
+GalacticDataset.distill_fasttext = distill_fasttext
+GalacticDataset.distill_embedding = distill_embedding

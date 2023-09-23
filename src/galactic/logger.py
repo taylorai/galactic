@@ -51,3 +51,6 @@ def setup_logger():
     ]
     for log_name in third_party_loggers:
         logging.getLogger(log_name).setLevel(logging.WARNING)
+
+    # do not propagate
+    logger.propagate = False

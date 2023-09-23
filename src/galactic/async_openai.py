@@ -99,14 +99,16 @@ class APIRequest:
                     status_tracker.time_of_last_rate_limit_error = time.time()
                     status_tracker.num_rate_limit_errors += 1
                 if "context length" in response["error"].get("message", ""):
-                    print("context length exceeded, retrying won't help")
+                    logger.error(
+                        "context length exceeded, retrying won't help"
+                    )
                     self.attempts_left = 0
                 self.result.append(response)
                 if self.attempts_left:
                     self.attempts_left -= 1
                     retry_queue.put_nowait(self)
                 else:
-                    print("out of tries")
+                    logger.error("out of tries")
                     status_tracker.num_tasks_in_progress -= 1
                     status_tracker.num_tasks_failed += 1
             else:
