@@ -8,6 +8,70 @@ To get started, install the package (`pip install galactic-ai`) and import it:
 from galactic import GalacticDataset
 ```
 
+## ✨ NEW! AI data labeling & classifier distillation ✨
+See the [OpenHermes](https://github.com/taylorai/galactic/blob/main/examples/hermes.ipynb) notebook for a full example, where we use OpenAI to label a few thousand examples, distill a speedy classifier, and then use that classifier to label 100k+ examples in 1 minute.
+
+### `ai_column`
+
+```python
+def ai_column(
+    self,
+    new_column: str,
+    prompt: str,
+    depends_on=list[str],
+    normalize: list[str] = ["strip"],  # must be methods of str class
+    system_prompt: Optional[str] = None
+) -> 'GalacticDataset':
+```
+
+**Parameters:**
+
+- `new_column (str)`: The name of the new column to create.
+- `prompt (str)`: The prompt to use for the AI model. Should be a Jinja2 template, with {{ placeholder }} for each of the fields in `depends_on`.
+- `depends_on (list[str])`: The fields to use as inputs to the prompt.
+- `normalize (list[str], default=['strip', 'lower'])`: The normalization methods to apply to the output of the AI model.
+- `system_prompt (str, optional)`: The system prompt to use. If not specified, will not use any system prompt.
+
+**Returns:**
+
+- `GalacticDataset`: The dataset with the new column added.
+
+
+### `ai_classifier`
+
+```python
+def ai_classifier(
+    self,
+    new_column: str,
+    field: Optional[str],
+    classes: Union[list[str], dict[str, str]],
+    prompt: Optional[str] = None,
+    backend="openai",
+)
+```
+
+**Parameters:**
+
+- `new_column (str)`: The name of the new column to create.
+- `field (str, optional)`: The field to use as input to the AI model. Can be None if using embedding similarity as the backend.
+- `classes (list[str] or dict[str, str])`: The classes to use for the classifier. Can be just a list of labels, or a dict of label: description. If provided, descriptions will be used for a) prompting API model if backend = 'openai', b) embedding if backend = "embeddings", c) zero-shot classification if backend = "huggingface".
+- `prompt` (str): Prompt template (Jinja2) to use for the API request, with a template slot for the field to classify. Only used if backend = 'openai'. If None, a basic default prompt will be used.
+- `backend` (str, default='openai'): The backend to use for the classifier. Options are 'openai', 'embeddings', and 'huggingface'. If "openai", will make API requests with logit bias to force the model to choose a valid category. If "embeddings", will use cosine similarity to the class embeddings. If "huggingface", will use zero-shot classification with a small HuggingFace model.
+
+### `ai_tagger`
+
+
+
+### `train_fasttext_classifier`
+
+### `fasttext_classifier`
+
+### `train_embeddings_classifier`
+
+### `embeddings_classifier`
+
+
+
 ## Loading and Saving Data
 
 
@@ -26,11 +90,6 @@ def from_csv(cls, path: str) -> 'GalacticDataset':
 
 - `GalacticDataset`: A dataset instance initialized from the CSV file.
 
-**Example:**
-
-```python
-ds = GalacticDataset.from_csv("data.csv")
-```
 
 ---
 
@@ -48,13 +107,7 @@ def from_jsonl(cls, path: str) -> 'GalacticDataset':
 **Returns:**
 
 - `GalacticDataset`: A dataset instance initialized from the JSONL file.
-
-**Example:**
-
-```python
-ds = GalacticDataset.from_jsonl("data.jsonl")
-```
-
+- 
 ---
 
 ### `from_parquet`
@@ -72,13 +125,6 @@ def from_jsonl(cls, path: str) -> 'GalacticDataset':
 
 - `GalacticDataset`: A dataset instance initialized from the Parquet file.
 
-**Example:**
-
-```python
-ds = GalacticDataset.from_parquet("data.parquet")
-
-```
-
 ---
 
 ### `from_pandas`
@@ -95,14 +141,6 @@ def from_pandas(cls, df) -> 'GalacticDataset':
 **Returns:**
 
 - `GalacticDataset`: A dataset instance initialized from the DataFrame.
-
-**Example:**
-
-```python
-import pandas as pd
-df = pd.read_csv("data.csv")
-ds = GalacticDataset.from_pandas(df)
-```
 
 ---
 
@@ -130,11 +168,6 @@ def from_hugging_face(
 
 - `GalacticDataset`: A dataset instance initialized from the Hugging Face dataset.
 
-**Example:**
-
-```python
-ds = GalacticDataset.from_hugging_face("squad", split="train")
-```
 
 ---
 
@@ -171,15 +204,15 @@ def from_hugging_face_stream(
 **Example:**
 
 ```python
-filters = [lambda x: x['field'] > 1]
-ds = GalacticDataset.from_hugging_face_stream("squad", split="train", filters=filters)
+filters = [lambda x: len(x['text']) > 1000]
+ds = GalacticDataset.from_hugging_face_stream("c4", split="train", config_name="en", filters=filters)
 ```
 
 ---
 
 ### `save`
 
-Saves the dataset to JSONL.
+Saves the dataset to JSONL or CSV.
 
 ```python
 def save(self, path: str, overwrite: bool = False) -> None:
@@ -187,18 +220,13 @@ def save(self, path: str, overwrite: bool = False) -> None:
 
 **Parameters:**
 
-- `path (str)`: The path to save the dataset to.
+- `path (str)`: The path to save the dataset to (must be .jsonl or .csv).
 - `overwrite (bool, optional)`: Whether to overwrite the file if it already exists.
 
 **Returns:**
 
 - `None`
 
-**Example:**
-
-```python
-ds.save("data.jsonl")
-```
 
 ---
 
@@ -277,9 +305,6 @@ ds.filter_regex(['text_field'], r'\d+')
 
 ---
 
-Feel free to modify the descriptions and examples as you see fit.
-
----
 
 ## Processing Data
 
@@ -298,12 +323,6 @@ def trim_whitespace(self, fields: Sequence[str], inplace: bool = True) -> 'Galac
 **Returns:**
 
 - `GalacticDataset`: Modified dataset with trimmed fields.
-
-**Example:**
-
-```python
-ds.trim_whitespace(['text_field'])
-```
 
 ---
 
@@ -378,11 +397,16 @@ ds.detect_language('text_field')
 ---
 
 ### `calc_perplexity`
-
-Warning: This is pretty slow, currently uses Pythia-70m. In the future, will substitute something smaller and faster like KenLM.
+By default, uses KenLM trained on English Wikipedia. To use a different KenLM model from [this repo](https://huggingface.co/edugp/kenlm/), you can set the 'language' and 'dataset' parameters. To use Pythia-70m, set the 'model' parameter to 'pythia'.
 
 ```python
-def calc_perplexity(self, field: str) -> 'GalacticDataset':
+def calc_perplexity(
+    self, 
+    field: str,
+    model: str = "kenlm",  # other option is pythia
+    language: Optional[str] = "en",
+    dataset: Optional[str] = "wikipedia",
+) -> 'GalacticDataset':
 ```
 
 **Parameters:**
@@ -393,11 +417,6 @@ def calc_perplexity(self, field: str) -> 'GalacticDataset':
 
 - `GalacticDataset`: Modified dataset with calculated perplexities.
 
-**Example:**
-
-```python
-ds.calc_perplexity('text_field')
-```
 
 ---
 
@@ -414,12 +433,6 @@ def detect_pii(self, fields: Sequence[str]) -> 'GalacticDataset':
 **Returns:**
 
 - `GalacticDataset`: Modified dataset with detected PII.
-
-**Example:**
-
-```python
-ds.detect_pii(['email_field', 'phone_field'])
-```
 
 ---
 
@@ -440,12 +453,6 @@ def count_tokens(self, fields: Sequence[str], tokenizer: Optional[str] = None) -
 
 - `GalacticDataset`: Modified dataset with token (or byte) counts.
 
-**Example:**
-
-```python
-ds.count_tokens(['text_field'], tokenizer="some_tokenizer")
-```
----
 
 ## Embedding and Clustering
 
@@ -465,11 +472,6 @@ def get_embeddings(self, field: str, backend: str = "auto") -> 'GalacticDataset'
 
 - `GalacticDataset`: Modified dataset with added embeddings.
 
-**Example:**
-
-```python
-ds.get_embeddings('text_field')
-```
 
 ---
 
@@ -488,11 +490,6 @@ def get_nearest_neighbors(self, query: Union[str, np.ndarray], k: int = 5) -> li
 
 - `list[dict]` of nearest neighbors by cosine similarity.
 
-**Example:**
-
-```python
-ds.get_nearest_neighbors('sample query')
-```
 
 ---
 
@@ -509,12 +506,6 @@ def cluster(self, n_clusters: int, method: str = "kmeans", batch_size: int = 102
 - `batch_size (int, default=1024)`: Batch size for 'minibatch_kmeans'.
 - `n_epochs (int, default=5)`: Number of epochs for 'minibatch_kmeans'.
 
-**Example:**
-
-```python
-ds.cluster(10)
-```
-
 ---
 
 ### `get_cluster_info`
@@ -525,17 +516,14 @@ def get_cluster_info(self) -> None:
 
 **Description:**
 
-- Provides information about the clusters, such as their sizes and prototypical examples.
+- Provides information about the clusters: their sizes and a few prototypical examples.
 
-**Example:**
-
-```python
-ds.get_cluster_info()
-```
 
 ---
 
 ### `remove_cluster`
+
+Removes a cluster from the dataset. Preferred to just "filtering" because it also removes the cluster from the cluster info stored in the dataset object.
 
 ```python
 def remove_cluster(self, cluster: int) -> None:
@@ -580,8 +568,4 @@ def semdedup(
 
 - `ValueError`: If neither `target_retention` nor `threshold` are specified.
 
-**Example:**
 
-```python
-ds.semdedup(target_retention=0.8)
-```

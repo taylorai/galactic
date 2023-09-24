@@ -90,15 +90,23 @@ def from_hugging_face_stream(
     return cls(datasets.Dataset.from_list(samples))
 
 
-# save dataset as jsonl
+# save dataset as jsonl or csv
 def save(self, path: str, overwrite: bool = False) -> None:
     # check if exists
     if os.path.exists(path) and not overwrite:
         raise ValueError(
             f"Path {path} already exists. Use overwrite=True to overwrite."
         )
+    # get format
+    ext = path.split(".")[-1]
+    if ext not in ["csv", "jsonl"]:
+        raise ValueError(
+            f"Unsupported file format {ext}. Must be either csv or jsonl."
+        )
+
     # save
-    with open(path, "wb") as f:
-        for sample in self.dataset:
-            f.write(json.dumps(sample).encode("utf-8"))
-            f.write("\n".encode("utf-8"))
+    if ext == "csv":
+        self.dataset.to_csv(path)
+    elif ext == "jsonl":
+        df = self.dataset.to_pandas()
+        df.to_json(path, orient="records", lines=True)

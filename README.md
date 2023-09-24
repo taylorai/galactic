@@ -32,6 +32,9 @@ To get started, install the package (`pip install galactic-ai`) and import it:
 from galactic import GalacticDataset
 ```
 
+## ✨ NEW! AI data labeling & classifier distillation ✨
+See the [OpenHermes](https://github.com/taylorai/galactic/blob/main/examples/hermes.ipynb) notebook for a full example, where we use OpenAI to label a few thousand examples, distill a speedy classifier, and then use that classifier to label 100k+ examples in 1 minute.
+
 ## Loading Data
 
 Galactic can load datasets from typical file formats (CSV, JSONL, Parquet), as well as from HuggingFace. If you're loading a massive dataset from HuggingFace, you can even filter data as it streams in, ensuring you don't load any duplicates, and you only hang on to data you want. For instance, here we will load the Falcon RefinedWeb dataset, but automatically deduplicate it, and only keep examples with fewer than 1024 characters. Let's get 5000 samples that meet our requirements.

@@ -2,9 +2,18 @@ import logging
 import datasets
 import pandas as pd
 import numpy as np
-from tqdm.auto import tqdm
 from typing import Optional, Sequence
 from dataclasses import dataclass
+from . import (
+    classifiers,
+    loaders,
+    filters,
+    taggers,
+    transforms,
+    embedding,
+    clustering,
+    minhash_lsh,
+)
 
 # set up logging
 from .logger import setup_logger
@@ -23,6 +32,47 @@ class GalacticDataset:
     openai_api_key: Optional[str] = None
     max_tokens_per_minute: Optional[int] = 100000
     max_requests_per_minute: Optional[int] = 2000
+
+    # attach all the imported methods
+    ## loaders
+    from_csv = classmethod(loaders.from_csv)
+    from_jsonl = classmethod(loaders.from_jsonl)
+    from_pandas = classmethod(loaders.from_pandas)
+    from_parquet = classmethod(loaders.from_parquet)
+    from_hugging_face = classmethod(loaders.from_hugging_face)
+    from_hugging_face_stream = classmethod(loaders.from_hugging_face_stream)
+    save = loaders.save
+    ## filters
+    filter_string = filters.filter_string
+    filter_regex = filters.filter_regex
+    ## taggers
+    tag_string = taggers.tag_string
+    tag_regex = taggers.tag_regex
+    detect_language = taggers.detect_language
+    detect_pii = taggers.detect_pii
+    count_tokens = taggers.count_tokens
+    calc_perplexity = taggers.calc_perplexity
+    ai_tagger = taggers.ai_tagger
+    ## transforms
+    trim_whitespace = transforms.trim_whitespace
+    unicode_normalize = transforms.unicode_normalize
+    ai_column = transforms.ai_column
+    ## classifiers
+    ai_classifier = classifiers.ai_classifier
+    fasttext_classifier = classifiers.fasttext_classifier
+    embeddings_classifier = classifiers.embeddings_classifier
+    train_fasttext_classifier = classifiers.train_fasttext_classifier
+    train_embeddings_classifier = classifiers.train_embeddings_classifier
+    ## embedding
+    initialize_embedding_model = embedding.initialize_embedding_model
+    get_embeddings = embedding.get_embeddings
+    get_nearest_neighbors = embedding.get_nearest_neighbors
+    ## clustering
+    cluster = clustering.cluster
+    remove_cluster = clustering.remove_cluster
+    get_cluster_info = clustering.get_cluster_info
+    semdedup = clustering.semdedup
+    ## minhash lsh
 
     def __post_init__(self):
         # add unique increaing int __id field if it doesn't already exist

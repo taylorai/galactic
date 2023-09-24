@@ -172,15 +172,14 @@ def detect_pii(self, fields: Sequence[str]):
         fields (List[str]): List of fields to detect PII in.
         Currently only supports "email", "phone", and "credential".
     """
+    # make sure all the fields exist
+    for field in fields:
+        if field not in self.dataset.features:
+            raise ValueError(f"Field {field} not found in dataset.")
 
     def detect_(sample):
-        filth = []
-        for field in fields:
-            if field in sample:
-                if isinstance(sample[field], str):
-                    filth.extend(scrubadub.list_filth(sample[field]))
-                else:
-                    filth.extend(scrubadub.list_filth(str(sample[field])))
+        text = " ".join([str(sample[field]) for field in fields])
+        filth = scrubadub.list_filth(text)
         filth_types = [f.detector_name for f in filth]
         return {
             **{
@@ -193,50 +192,6 @@ def detect_pii(self, fields: Sequence[str]):
     self.dataset = self.dataset.map(detect_)
     logger.info(
         f"Detected PII in fields: {fields}; added __pii__email, __pii__phone, __pii__credential, and __pii__any metadata."
-    )
-    # no option to do out-of-place as this operation is not destructive
-    return self
-
-
-def detect_seo_spam(self, field: str):
-    """
-    Uses a FastText model distilled from GPT-3.5-turbo to flag documents likely to be SEO spam or otherwise
-    repetitive, machine-generated, or worthless. Trained on web documents from Falcon RefinedWeb, unlikely to
-    perform well out-of-distribution. Preprocessing is built-in, we just lowercase -> replace \n with space.
-    """
-    # make sure field exists in dataset and are strings
-    if field not in self.dataset.features:
-        raise ValueError(f"Field {field} not found in dataset.")
-    elif self.dataset.features[field].dtype != "string":
-        raise ValueError(
-            f"Field {field} is not a string field, and so can't be used to detect SEO spam."
-        )
-
-    import fasttext
-
-    model_path = huggingface_hub.hf_hub_download(
-        repo_id="TaylorAI/galactic-models", filename="seo_spam.ftz"
-    )
-    model = fasttext.load_model(model_path)
-
-    def detect_(sample):
-        result = model.predict(
-            sample[field].replace("\n", " ").lower()
-        )  # [0][0].split("__label__")[1]
-        label, prob = result[0][0].split("__label__")[1], result[1][0]
-        if label == "discard":
-            return {
-                f"__seo_spam__{field}": True,
-                f"__seo_spam_prob__{field}": prob,
-            }
-        return {
-            f"__seo_spam__{field}": False,
-            f"__seo_spam_prob__{field}": 1 - prob,
-        }
-
-    self.dataset = self.dataset.map(detect_)
-    logger.info(
-        f"Detected SEO spam in fields '{field}'; added __seo_spam metadata."
     )
     # no option to do out-of-place as this operation is not destructive
     return self

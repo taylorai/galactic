@@ -108,7 +108,7 @@ def embed_with_openai(text: str, key: str):
     return avg / np.linalg.norm(avg)
 
 
-def get_embedding_model(self, backend: str = "auto"):
+def initialize_embedding_model(self, backend: str = "auto"):
     # if auto, then select intelligently
     if backend == "auto":
         if "__embedding" in self.dataset.column_names:
@@ -152,7 +152,7 @@ def get_embedding_model(self, backend: str = "auto"):
 
 
 def get_embeddings(self, field: str, backend: str = "auto"):
-    self.get_embedding_model(backend=backend)
+    self.initialize_embedding_model(backend=backend)
     if backend == "auto":
         backend = "cpu"
     if backend == "openai":
