@@ -11,6 +11,23 @@ from galactic import GalacticDataset
 ## ✨ NEW! AI data labeling & classifier distillation ✨
 See the [OpenHermes](https://github.com/taylorai/galactic/blob/main/examples/hermes.ipynb) notebook for a full example, where we use OpenAI to label a few thousand examples, distill a speedy classifier, and then use that classifier to label 100k+ examples in 1 minute.
 
+### `set_openai_key`
+
+```python
+def set_openai_key(self, key: str) -> None:
+```
+
+Set the OpenAI API key for the dataset. This is required for using the `ai_column` and `ai_tagger` methods, or OpenAI embeddings. (You can compute local embeddings on CPU without it.)
+
+### `set_rate_limits`
+
+
+```python
+def set_rate_limits(self, max_requests_per_minute: int, max_tokens_per_minute: int) -> None:
+```
+
+Set the rate limits for the dataset. This is only needed if you have higher rate limits than the default (generally 3000 requests per minute and 350000 tokens per minute, but it depends on the model). It's not a huge deal because we throttle requests to try to stay under these, but if you set them too high, there will be lots of pauses, and if they're too low you aren't taking full advantage of your rate limits.
+
 ### `ai_column`
 
 ```python
@@ -60,15 +77,130 @@ def ai_classifier(
 
 ### `ai_tagger`
 
+```python
+def ai_tagger(
+    self,
+    field: str,
+    tags: Union[list[str], dict[str, str]],
+    prompt: Optional[str] = None,
+    backend="openai",
+    allow_not_sure: bool = False,
+) -> 'GalacticDataset':
+```
 
+**Parameters:**
+
+- `field (str)`: The field to use as input to the AI model.
+- `tags (list[str] or dict[str, str])`: The tags to use for the tagger. Can be just a list of labels, or a dict of label: description. If provided, descriptions will be used for a) prompting API model if backend = 'openai', b) embedding if backend = "embeddings", c) zero-shot classification if backend = "huggingface".
+- `prompt` (str): Prompt template (Jinja2) to use for the API request, with a template slot for the field to classify.
+- `backend` (str, default='openai'): The backend to use for the classifier. Only "openai" is currently supported.
+- `allow_not_sure` (bool, default=False): Whether to allow the model to select "not sure" when deciding whether a tag applies. Can be useful if you want to consider the model's uncertainty rather than forcing it to make a decision.
+
+**Returns:**
+
+- `GalacticDataset`: The dataset with the new columns added for each tag.
 
 ### `train_fasttext_classifier`
 
+```python
+def train_fasttext_classifier(
+    self,
+    model_name: str,
+    save_dir: str,
+    input_field: str,
+    label_field: str,
+    validation_split: float = 0.1,
+    test_split: float = 0.1,
+    normalize: list[str] = ["lower", "strip"],
+    split_punctuation: bool = True,
+    replace_newlines_with: str = " __newline__ ",
+    target_model_size: str = "2M",
+    training_duration: int = 300,
+    random_seed: int = 42,
+) -> None:
+```
+
+**Parameters:**
+
+- `model_name (str)`: A name for the new model (will be used for saving).
+- `save_dir (str)`: The directory to save the model to.
+- `input_field (str)`: The field to use as input to the classifier.
+- `label_field (str)`: The field to use as labels for the classifier.
+- `validation_split (float, default=0.1)`: The fraction of the dataset to use for validation (hyperparameter search).
+- `test_split (float, default=0.1)`: The fraction of the dataset to use for testing.
+- `normalize (list[str], default=['lower', 'strip'])`: The normalization methods to apply to the input field.
+- `split_punctuation (bool, default=True)`: Whether to split punctuation into separate tokens.
+- `replace_newlines_with (str, default=' __newline__ ')`: The string to replace newlines with (FastText doesn't allow newlines).
+- `target_model_size (str, default='2M')`: The target model size (in bytes). You can put things like, "500K", "1M", etc.
+- `training_duration (int, default=300)`: The training duration in seconds (more time means more trials with different hyperparameters).
+- `random_seed (int, default=42)`: The random seed to use for reproducibility.
+
 ### `fasttext_classifier`
+
+```python
+def fasttext_classifier(
+    self,
+    new_column: str,
+    model_path: str,
+    field: str,
+    normalize: list[str] = ["lower", "strip"],
+    split_punctuation: bool = True,
+    replace_newlines_with: str = " __newline__ ",
+) -> 'GalacticDataset':
+```
+
+**Parameters:**
+
+- `new_column (str)`: The name of the new column to create.
+- `model_path (str)`: The path to the FastText model saved by `train_fasttext_classifier`. Should include the extension (.ftz).
+- `field (str)`: The field to use as input to the classifier.
+- `normalize (list[str], default=['lower', 'strip'])`: The normalization methods to apply to the input field. Should match the normalization methods used when training the model.
+- `split_punctuation (bool, default=True)`: Whether to split punctuation into separate tokens. Should match the setting used when training the model.
+- `replace_newlines_with (str, default=' __newline__ ')`: The string to replace newlines with (FastText doesn't allow newlines). Should match the setting used when training the model.
 
 ### `train_embeddings_classifier`
 
+```python
+def train_embeddings_classifier(
+    self,
+    model_name: str,
+    save_dir: str,
+    label_field: str,
+    model_type: str = "svm",
+    input_field: str = "__embedding",
+    validation_split=0.1,
+    test_split=0.1,
+    random_seed: int = 42,
+) -> None:
+```
+
+**Parameters:**
+
+- `model_name (str)`: A name for the new model (will be used for saving).
+- `save_dir (str)`: The directory to save the model to.
+- `label_field (str)`: The field to use as labels for the classifier.
+- `model_type (str, default='svm')`: The type of classifier to use. Options are 'svm' and 'logistic_regression'.
+- `input_field (str, default='__embedding')`: The field to use as input to the classifier. Should be the embedding (or another list of floats, if you have that around for some reason).
+- `validation_split (float, default=0.1)`: The fraction of the dataset to use for validation (early stopping).
+- `test_split (float, default=0.1)`: The fraction of the dataset to use for testing.
+- `random_seed (int, default=42)`: The random seed to use for reproducibility.
+
 ### `embeddings_classifier`
+
+```python
+def embeddings_classifier(
+    self,
+    new_column: str,
+    model_path: str,
+    field: str = "__embedding",
+):
+```
+
+**Parameters:**
+
+- `new_column (str)`: The name of the new column to create.
+- `model_path (str)`: The path to the embeddings classifier model saved by `train_embeddings_classifier`. Just use the model name with no extension, since we have to load both the model and the label encoder.
+- `field (str, default='__embedding')`: The field to use as input to the classifier. Should be the embedding (or another list of floats, if you have that around for some reason). Has to match the features used to train the model.
 
 
 

@@ -32,8 +32,12 @@ To get started, install the package (`pip install galactic-ai`) and import it:
 from galactic import GalacticDataset
 ```
 
-## ✨ NEW! AI data labeling & classifier distillation ✨
-See the [OpenHermes](https://github.com/taylorai/galactic/blob/main/examples/hermes.ipynb) notebook for a full example, where we use OpenAI to label a few thousand examples, distill a speedy classifier, and then use that classifier to label 100k+ examples in 1 minute.
+Galactic supports familiar generic methods for data processing that you'll be familiar with if you've ever used HuggingFace datasets, like `map`, `filter`, `select`. Galactic also provides a higher-level API for common workflows in text data curation, such as computing embeddings, language detection, scrubbing PII, labeling columns with AI, and large-scale deduplication. Let's dive in!
+
+## ✨ NEW! (v0.2.4) AI data labeling & classifier distillation ✨
+Galactic now supports using AI to augment and enrich your datasets. Classify a text column into fixed categories with `ai_classifier`, do open-ended processing like cleaning or summarization with `ai_column`, or tag multiple attributes with `ai_tagger`. When you hit your budget for sending API calls to OpenAI and still want to go bigger, train a `fasttext_classifier` or `embeddings_classifier` to distill your AI- or human-written labels into a fast classifier without leaving your notebook.
+
+See the [OpenHermes](https://github.com/taylorai/galactic/blob/main/examples/hermes.ipynb) example notebook for a full demonstration, where we use OpenAI to label a few thousand examples, distill a speedy classifier, and then use that classifier to label 100k+ examples in 1 minute. All the AI labeling and distillation methods are documented in the [API reference](https://github.com/taylorai/galactic/blob/main/API_REFERENCE.md) as well.
 
 ## Loading Data
 

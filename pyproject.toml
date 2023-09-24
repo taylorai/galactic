@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 
 [project]
 name = "galactic-ai"
-version="0.2.3"
+version="0.2.4"
 authors = [
     {name = "Benjamin Anderson", email = "ben@trytaylor.ai"},
 ]
@@ -35,8 +35,8 @@ dependencies = [
     "sentencepiece",
     "aiohttp",
     "protobuf==3.20.2",
-    "scikit-learn",
     "joblib",
+    "datasketch",
     "nest_asyncio"
 ]
 
