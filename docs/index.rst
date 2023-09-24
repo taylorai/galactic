@@ -10,7 +10,7 @@ Welcome to galactic-ai's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   api  # this will look for a file named api.rst
+   api
 
 Indices and tables
 ==================
