@@ -4,6 +4,11 @@ data/
 # models
 models/
 
+# sphinx docs
+docs/_build/
+docs/_static/
+docs/_templates/
+
 # any other local stuff
 local/
 
