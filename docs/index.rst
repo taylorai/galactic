@@ -18,3 +18,6 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+
+api  # this will look for a file named api.rst
