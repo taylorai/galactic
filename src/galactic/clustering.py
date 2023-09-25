@@ -19,6 +19,7 @@ def cluster(
     batch_size: int = 1024,
     n_epochs: int = 5,
 ):
+    """Cluster the dataset using the specified method."""
     if "__embedding" not in self.dataset.column_names:
         raise ValueError(
             "You must call get_embeddings() before calling cluster(). If your dataset already has an embeddings column, make sure it's named '__embeddings'."
@@ -57,6 +58,7 @@ def cluster(
 
 # preferred to filtering out the cluster, because it will remove the cluster from the cluster_ids list
 def remove_cluster(self, cluster: int):
+    """Remove a cluster from the dataset."""
     self.dataset = self.dataset.filter(lambda x: x["__cluster"] != cluster)
     self.cluster_ids.remove(cluster)
     del self.cluster_centers[cluster]
@@ -93,6 +95,7 @@ def get_cluster_info(self, n_neighbors: int = 3, field: str = None):
 def get_duplicates(
     cluster: datasets.Dataset, threshold: float, strategy: str = "random"
 ):
+    """Get duplicates in a cluster."""
     duplicates = []
     num_points = len(cluster)
     emb_matrix = np.array(cluster["__embedding"])
@@ -135,6 +138,7 @@ def tune_threshold(
     tol: float = 0.01,
     max_iter: int = 30,
 ):
+    """Tune the threshold for a cluster."""
     tol = max(tol, 1 / len(cluster))
     emb_matrix = np.array(cluster["__embedding"])
     similarities = np.dot(emb_matrix, emb_matrix.T)
@@ -173,6 +177,7 @@ def semdedup(
     threshold: Optional[float] = None,
     inplace=True,
 ):
+    """Remove semantic near-duplicates from the dataset."""
     if target_retention is None and threshold is None:
         raise ValueError(
             "You must specify either target_retention or threshold."
