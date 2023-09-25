@@ -154,6 +154,12 @@ class GalacticDataset:
             return wrapper
 
     def set_openai_key(self, key):
+        """
+        This method sets the OpenAI API key.
+
+        :param key: The OpenAI API key.
+        :type key: str
+        """
         self.openai_api_key = key
 
     def set_rate_limits(self, **kwargs):

@@ -1,5 +1,3 @@
 Installation
 =================
 
-.. automodule:: galactic
-   :members:
