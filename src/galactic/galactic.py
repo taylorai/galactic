@@ -24,7 +24,7 @@ logger = logging.getLogger("galactic")
 
 @dataclass
 class GalacticDataset:
-    """This is the GalacticDataset class"""
+    """This is the GalacticDataset class. It contains methods for loading data, filtering data, tagging data, transforming data, and classifying data."""
     dataset: datasets.Dataset
     model: Optional[object] = None
     emb_matrix: Optional[np.ndarray] = None

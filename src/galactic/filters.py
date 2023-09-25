@@ -11,6 +11,7 @@ logger = logging.getLogger("galactic")
 
 
 def apply_bloom_filter(self, fields: Sequence[str], inplace: bool = True):
+    """Apply a Bloom filter to the dataset, filtering out duplicate examples."""
     bloom = pybloom_live.BloomFilter(
         capacity=len(self.dataset)
         if len(self.dataset) < int(1.0e9)
@@ -56,7 +57,6 @@ def filter_string(
     Args:
         field (str): The field to check against.
         values (List[str]): List of strings to filter on.
-
     """
     # make a regexp that matches any of the fields
     regexp = re.compile("|".join([re.escape(val) for val in values]))
