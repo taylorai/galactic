@@ -1,5 +1,6 @@
-API Documentation
+API
 =================
 
-.. automodule:: galactic
+.. autoclass:: galactic.GalacticDataset
    :members:
+   :inherited-members:

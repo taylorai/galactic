@@ -1,0 +1,5 @@
+Installation
+=================
+
+.. automodule:: galactic
+   :members:

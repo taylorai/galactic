@@ -24,6 +24,7 @@ logger = logging.getLogger("galactic")
 
 @dataclass
 class GalacticDataset:
+    """This is the GalacticDataset class"""
     dataset: datasets.Dataset
     model: Optional[object] = None
     emb_matrix: Optional[np.ndarray] = None
@@ -75,6 +76,14 @@ class GalacticDataset:
     ## minhash lsh
 
     def __post_init__(self):
+        """
+        Initializes the GalacticDataset instance.
+        If '__id' does not exist in dataset columns, it is added.
+        If the dataset contains cluster and embedding info but no cluster centers, they are set.
+        If the dataset contains embeddings, the embedding matrix is set.
+        Raises:
+        ValueError: If the dataset contains duplicate __id values.
+        """
         # add unique increaing int __id field if it doesn't already exist
         if "__id" not in self.dataset.column_names:
             self.dataset = self.dataset.map(
