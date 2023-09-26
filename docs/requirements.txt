@@ -3,4 +3,4 @@ sphinx-rtd-theme
 recommonmark
 sphinx-autodoc-typehints
 sphinx_copybutton
-sphinx-book-theme
+sphinx-book-theme==1.0.1
