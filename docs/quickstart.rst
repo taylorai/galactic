@@ -3,6 +3,7 @@ Quick Start
 
 Setup dataset
 -------------------
+Once you have installed Galactic, you can start using it by following the steps below:
 
 1. Import GalacticDataset
 
@@ -14,24 +15,21 @@ Setup dataset
 2. Load a Dataset
 
 .. note::
-      See :doc:`GalacticDataset.loaders <loaders>` for more details on how to load a dataset.
+      See :doc:`GalacticDataset.loaders <loaders>` for more options on loading datasets (e.g. parquet, HuggingFace, jsonl, pandas, etc.)
 
 .. code:: python 
 
-   ds = GalacticDataset.load_dataset("path/to/dataset")
+   # Load from a csv file
+   ds = GalacticDataset.from_csv("path/to/dataset")
 
-3. Create a GalacticDataset Instance
-
-
-.. code:: python 
-
-   galactic_dataset = GalacticDataset(dataset=ds)
-
-
-Verify the Dataset
+3. Verify the Dataset
 
 .. code:: python
 
+   # Confirm the dataset loaded
+   print(ds)
+
+   # Verify the first element of the dataset
    first_element = galactic_dataset[0]
    print(first_element)
 

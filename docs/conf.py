@@ -15,6 +15,11 @@ project = "Galactic"
 copyright = "Taylor AI, Inc., 2023"
 author = "Benjamin Anderson & Brian Kim"
 
+favicons = [
+    "logo-dark.ico",
+    "logo-light.png",
+]
+
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
@@ -24,6 +29,7 @@ extensions = [
     "sphinx.ext.napoleon",  # Support for NumPy and Google style docstrings
     "sphinx_autodoc_typehints",  # Automatically document param types (less noise in class signature)
     "sphinx_copybutton",  # Add copy button to code blocks
+    "sphinx_favicon",  # Add favicon
 ]
 
 templates_path = ["_templates"]
