@@ -50,7 +50,7 @@ def cluster(
 
     elif method == "kmeans":
         model = KMeans(n_clusters=n_clusters, init="k-means++", n_init=1)
-        arr = np.array(self.dataset["__embedding"])
+        arr = np.array(self.dataset[embedding_field])
         model.fit(arr)
         self.cluster_ids = list(range(n_clusters))
         # cluster centers is a dict of id -> center
@@ -64,13 +64,19 @@ def cluster(
             n_init=1,
             bisecting_strategy="largest_cluster",
         )
-        arr = np.array(self.dataset["__embedding"])
-
+        arr = np.array(self.dataset[embedding_field])
+        model.fit(arr)
+        self.cluster_ids = list(range(n_clusters))
+        # cluster centers is a dict of id -> center
+        self.cluster_centers = {
+            i: model.cluster_centers_[i] for i in range(n_clusters)
+        }
+    else:
         raise ValueError(f"Unknown clustering method: {method}")
 
     # add new column with cluster labels
     self.dataset = self.dataset.map(
-        lambda x: {"__cluster": model.predict(x["__embedding"])},
+        lambda x: {"__cluster": model.predict(x[embedding_field])},
         batched=True,
     )
 
