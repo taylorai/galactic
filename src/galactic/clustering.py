@@ -16,14 +16,29 @@ logger = logging.getLogger("galactic")
 
 def cluster(
     self,
-    n_clusters: int,
+    n_clusters: int, 
     method: Literal[
         "kmeans", "minibatch_kmeans", "bisecting_kmeans", "hdbscan"
     ] = "kmeans",
     embedding_field: str = "__embedding",
     **kwargs,
 ):
-    """Cluster the dataset using the specified method."""
+    """
+    Cluster the dataset using the specified method.
+
+    .. code-block:: python
+
+        # Cluster your dataset into 10 clusters using minibatch k-means
+        ds.cluster(n_clusters=10)
+
+    :param n_clusters: Required. The number of clusters to form.
+    :param method: Optional. The clustering method to use. Default = ``kmeans``.
+    :param embedding_field: Optional. Specify a name for the field to use for clustering. Default = ``__embedding``.
+    :param kwargs: Optional. Additional keyword arguments to pass to the clustering algorithm.
+
+    """
+
+
     if embedding_field not in self.dataset.column_names:
         raise ValueError(
             "You must call get_embeddings() before calling cluster(). If your dataset already has an embeddings column, pass it as 'embedding_field' argument."
@@ -77,7 +92,16 @@ def cluster(
 
 # preferred to filtering out the cluster, because it will remove the cluster from the cluster_ids list
 def remove_cluster(self, cluster: int):
-    """Remove a cluster from the dataset."""
+    """
+    Remove a cluster from the dataset.
+
+    .. code-block:: python
+
+        # Remove cluster 2 from the dataset
+        ds.remove_cluster(cluster:2)
+
+    :param cluster: The cluster ID to be removed from the dataset.
+    """
     self.dataset = self.dataset.filter(lambda x: x["__cluster"] != cluster)
     self.cluster_ids.remove(cluster)
     del self.cluster_centers[cluster]
@@ -92,6 +116,24 @@ def ai_label_clusters(
     embedding_field: str = "__embedding",
     prompt: Optional[str] = None,  # jinja2 template
 ):
+    
+    """
+    Labels the clusters using AI based on the given fields and prompt template.
+
+    .. code-block:: python
+
+        # Example usage:
+        ds.ai_label_clusters(fields=['field1', 'field2'], selection='nearest')
+
+    :param fields: List of fields used to identify clusters.
+    :param new_column: Optional. Name of the new column where the cluster labels will be stored. Defaults to '__cluster_label'.
+    :param n_examples: Optional. Number of examples to consider for labeling. Defaults to 10.
+    :param selection: Optional. Strategy to select examples for labeling. Can be 'random' or 'nearest'. Defaults to 'random'.
+    :param embedding_field: Optional. Name of the embedding field to be used. Defaults to '__embedding'.
+    :param prompt: Optional. Jinja2 template string to be used as the prompt for labeling.
+    :return: The modified object with labeled clusters.
+    """
+
     if not prompt:
         # Default Jinja2 template
         prompt = """
@@ -105,6 +147,7 @@ def ai_label_clusters(
         {% endfor %}
         
         Now, state the single topic or theme in 3-10 words, no long lists:
+
         """.strip()
     template = jinja2.Template(prompt)
     queries = []
@@ -139,7 +182,16 @@ def ai_label_clusters(
 
 def get_cluster_info(self, n_neighbors: int = 3, field: str = None):
     """
-    Goal is to do some kind of unsupervised domain discovery thing here to figure out what the clusters mean.
+    Retrieves information regarding clusters and their nearest neighbors.
+
+    .. code-block:: python
+
+        # Example usage:
+        ds.get_cluster_info(n_neighbors=5, field='title')
+
+    :param n_neighbors: Number of nearest neighbors to be retrieved for each cluster. Defaults to 3.
+    :param field: Optional specific field to be printed from the neighbors.
+    :raises ValueError: If cluster() or get_embeddings() methods are not called prior to calling this method.
     """
     if not hasattr(self, "cluster_centers"):
         raise ValueError(
@@ -168,7 +220,22 @@ def get_cluster_info(self, n_neighbors: int = 3, field: str = None):
 def get_duplicates(
     cluster: datasets.Dataset, threshold: float, strategy: str = "random"
 ):
-    """Get duplicates in a cluster."""
+
+    """
+    Retrieves duplicates within a specified cluster based on a threshold.
+
+    .. code-block:: python
+
+        # Example usage:
+        duplicates = get_duplicates(cluster=ds, threshold=0.8, strategy='nearest')
+
+    :param cluster: The dataset cluster to be analyzed for duplicates.
+    :param threshold: Similarity threshold to consider two items as duplicates.
+    :param strategy: Strategy to select duplicates, can be 'random', 'nearest', or 'furthest'. Defaults to 'random'.
+    :raises ValueError: If an unknown strategy is provided.
+    :return: List of identified duplicate items within the cluster.
+    """
+
     duplicates = []
     num_points = len(cluster)
     emb_matrix = np.array(cluster["__embedding"])
@@ -211,7 +278,21 @@ def tune_threshold(
     tol: float = 0.01,
     max_iter: int = 30,
 ):
-    """Tune the threshold for a cluster."""
+    """
+    Tunes the threshold for identifying duplicates within a cluster to achieve a target retention rate.
+
+    .. code-block:: python
+
+        # Example usage:
+        threshold = tune_threshold(cluster=ds, target_retention=0.9)
+
+    :param cluster: The dataset cluster to be analyzed.
+    :param target_retention: Target retention rate to achieve.
+    :param tol: Tolerance for the difference between achieved and target retention rate. Defaults to 0.01.
+    :param max_iter: Maximum number of iterations for tuning. Defaults to 30.
+    :return: The tuned threshold value.
+    """
+
     tol = max(tol, 1 / len(cluster))
     emb_matrix = np.array(cluster["__embedding"])
     similarities = np.dot(emb_matrix, emb_matrix.T)
@@ -250,7 +331,21 @@ def semdedup(
     threshold: Optional[float] = None,
     inplace=True,
 ):
-    """Remove semantic near-duplicates from the dataset."""
+    
+    """
+    Removes semantic near-duplicates from the dataset based on the target retention rate or a specified threshold.
+
+    .. code-block:: python
+
+        # Example usage:
+        ds.semdedup(target_retention=0.85, inplace=False)
+
+    :param target_retention: Optional target retention rate. Defaults to 0.8.
+    :param threshold: Optional similarity threshold for identifying duplicates.
+    :param inplace: Whether to remove duplicates in-place or return a new object. Defaults to True.
+    :return: If inplace is False, returns the modified object without duplicates.
+    """
+    
     if target_retention is None and threshold is None:
         raise ValueError(
             "You must specify either target_retention or threshold."
