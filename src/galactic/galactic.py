@@ -28,25 +28,6 @@ class GalacticDataset:
     """
     This is the GalacticDataset class. It contains methods for loading data,
     filtering data, tagging data, transforming data, and classifying data.
-
-    .. code-block:: python
-
-        # Example of creating an instance of GalacticDataset
-        from galactic import GalacticDataset
-
-        # Assuming datasets.Dataset instance is stored in `ds` variable
-        galactic_dataset = GalacticDataset(dataset=ds)
-
-        # Example of setting the OpenAI API key
-        galactic_dataset.set_openai_key("your-api-key")
-
-        # Example of setting rate limits
-        galactic_dataset.set_rate_limits(max_tokens_per_minute=10000, max_requests_per_minute=100)
-
-        # Interacting with the dataset
-        first_element = galactic_dataset[0]
-        print(first_element)
-
     """
 
     dataset: datasets.Dataset
