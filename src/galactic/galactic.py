@@ -25,6 +25,29 @@ logger = logging.getLogger("galactic")
 
 @dataclass
 class GalacticDataset:
+    """
+    This is the GalacticDataset class. It contains methods for loading data, 
+    filtering data, tagging data, transforming data, and classifying data.
+    
+    .. code-block:: python
+    
+        # Example of creating an instance of GalacticDataset
+        from galactic import GalacticDataset
+                
+        # Assuming datasets.Dataset instance is stored in `ds` variable
+        galactic_dataset = GalacticDataset(dataset=ds)
+        
+        # Example of setting the OpenAI API key
+        galactic_dataset.set_openai_key("your-api-key")
+        
+        # Example of setting rate limits
+        galactic_dataset.set_rate_limits(max_tokens_per_minute=10000, max_requests_per_minute=100)
+        
+        # Interacting with the dataset
+        first_element = galactic_dataset[0]
+        print(first_element)
+        
+    """
     dataset: datasets.Dataset
     model: Optional[object] = None
     emb_matrix: Optional[np.ndarray] = None
@@ -81,6 +104,14 @@ class GalacticDataset:
     plot_embeddings = visualize.plot_embeddings
 
     def __post_init__(self):
+        """
+        Initializes the GalacticDataset instance.
+        If '__id' does not exist in dataset columns, it is added.
+        If the dataset contains cluster and embedding info but no cluster centers, they are set.
+        If the dataset contains embeddings, the embedding matrix is set.
+        Raises:
+        ValueError: If the dataset contains duplicate __id values.
+        """
         # add unique increaing int __id field if it doesn't already exist
         if "__id" not in self.dataset.column_names:
             self.dataset = self.dataset.map(
@@ -151,6 +182,12 @@ class GalacticDataset:
             return wrapper
 
     def set_openai_key(self, key):
+        """
+        This method sets the OpenAI API key.
+
+        :param key: The OpenAI API key.
+        :type key: str
+        """
         self.openai_api_key = key
 
     def set_rate_limits(self, **kwargs):

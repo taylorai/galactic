@@ -19,6 +19,7 @@ logger = logging.getLogger("galactic")
 
 
 def tag_string(self, fields: Sequence[str], values: Sequence[str], tag: str):
+    """Tag data containing a particular string or list of strings in the specified field."""
     # make sure the tag hasn't already been used
     if f"__tag__{tag}" in self.dataset.column_names:
         logger.warning(
@@ -74,6 +75,7 @@ def tag_regex(self, fields: Sequence[str], regex: str, tag: str):
 
 
 def detect_language(self, field: str):
+    """Detect the language of the specified field."""
     # make sure field exists
     if field not in self.dataset.features:
         raise ValueError(f"Field {field} not found in dataset.")
@@ -112,6 +114,7 @@ def calc_perplexity(
     language: Optional[str] = "en",
     dataset: Optional[str] = "wikipedia",
 ):
+    """Calculate the perplexity-per-byte of the specified field."""
     # make sure field exists and is a string field
     if field not in self.dataset.features:
         raise ValueError(f"Field {field} not found in dataset.")

@@ -16,21 +16,25 @@ logger = logging.getLogger("galactic")
 
 
 def from_csv(cls, path: str):
+    """Load a dataset from a csv file."""
     df = read_csv(path)
     return cls.from_pandas(df)
 
 
 def from_jsonl(cls, path):
+    """Load a dataset from a jsonl file."""
     df = pd.read_json(path, lines=True, orient="records")
     return cls.from_pandas(df)
 
 
 def from_parquet(cls, path):
+    """Load a dataset from a parquet file."""
     df = pd.read_parquet(path)
     return cls.from_pandas(df)
 
 
 def from_pandas(cls, df, **kwargs):
+    """Load a dataset from a pandas dataframe."""
     dataset = datasets.Dataset.from_pandas(df, **kwargs)
     return cls(dataset)
 
@@ -38,6 +42,7 @@ def from_pandas(cls, df, **kwargs):
 def from_hugging_face(
     cls, path: str, split: str, config_name: Optional[str] = None, **kwargs
 ):
+    """Load a dataset from the Hugging Face hub."""
     dataset = datasets.load_dataset(
         path, name=config_name, split=split, **kwargs
     )
@@ -54,6 +59,7 @@ def from_hugging_face_stream(
     max_samples: Optional[int] = 200000,
     **kwargs,
 ):
+    """Load a dataset from the Hugging Face hub, streaming the data from disk."""
     handle = datasets.load_dataset(
         path, name=config_name, split=split, streaming=True, **kwargs
     )
@@ -92,6 +98,7 @@ def from_hugging_face_stream(
 
 # save dataset as jsonl or csv
 def save(self, path: str, overwrite: bool = False) -> None:
+    """Save a dataset as a csv or jsonl file."""
     # check if exists
     if os.path.exists(path) and not overwrite:
         raise ValueError(

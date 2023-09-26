@@ -14,6 +14,7 @@ logger = logging.getLogger("galactic")
 
 
 class EmbeddingModel:
+    """Embedding model class."""
     def __init__(self, model_path, tokenizer_path, model_type, max_length=512):
         self.model_path = model_path
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
@@ -91,6 +92,7 @@ class EmbeddingModel:
 
 
 def embed_with_openai(text: str, key: str):
+    """Embed a single text with OpenAI API."""
     encoding = tiktoken.get_encoding("cl100k_base")
     tokens = encoding.encode(text)
     # if longer than 8191, split into chunks
@@ -110,6 +112,7 @@ def embed_with_openai(text: str, key: str):
 
 
 def initialize_embedding_model(self, backend: str = "auto"):
+    """Initialize the embedding model."""
     # if auto, then select intelligently
     if backend == "auto":
         if "__embedding" in self.dataset.column_names:
@@ -158,6 +161,7 @@ def get_embeddings(
     embedding_field: str = "__embedding",
     backend: str = "auto",
 ):
+    """Get embeddings for a field in the dataset."""
     self.initialize_embedding_model(backend=backend)
     if backend == "auto":
         backend = "cpu"
@@ -183,6 +187,7 @@ def get_nearest_neighbors(
     k: int = 5,
     embedding_field: str = "__embedding",
 ):
+    """Get the nearest neighbors to a query."""
     if embedding_field not in self.dataset.column_names:
         raise ValueError(
             "You must call get_embeddings() before calling get_nearest_neighbors(). If your dataset already has an embeddings column and it's not '__embeddings', pass it as the 'embedding_field' argument."

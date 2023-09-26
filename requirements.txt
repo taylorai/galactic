@@ -26,3 +26,4 @@ protobuf==3.20.2
 joblib
 nest_asyncio
 umap-learn
+datasketch

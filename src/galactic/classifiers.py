@@ -34,6 +34,7 @@ def train_fasttext_classifier(
     training_duration: int = 300,
     random_seed: int = 42,
 ):
+    """Train a fasttext classifier on the dataset."""
     def _preprocess(text):
         text = str(text)
         for fn in normalize:
@@ -102,6 +103,7 @@ def train_embeddings_classifier(
     test_split=0.1,
     random_seed: int = 42,
 ):
+    """Train a classifier on the dataset using the embeddings."""
     if "__embedding" not in input_field:
         logger.warning(
             "This is designed to use the embeddings (typically '__embedding') as input. I hope you know what you're doing..."
@@ -311,6 +313,7 @@ def fasttext_classifier(
     split_punctuation: bool = True,
     replace_newlines_with: str = " __newline__ ",
 ):
+    """Use a fasttext model to classify a field."""
     # make sure the input field is a string
     if self.dataset.features[field].dtype != "string":
         raise ValueError(f"Field {field} is not a string field.")
@@ -348,6 +351,7 @@ def embeddings_classifier(
     model_path: str,
     field: str = "__embedding",
 ):
+    """Use an embeddings model to classify a field."""
     model = joblib.load(model_path + ".joblib")
     le = joblib.load(model_path + ".labels.joblib")
 
