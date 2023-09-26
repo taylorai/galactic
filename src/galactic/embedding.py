@@ -3,7 +3,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 from huggingface_hub import hf_hub_download
-from typing import Union
+from typing import Union, Literal
 import openai
 import tiktoken
 from .async_openai import embed_texts_with_openai
@@ -208,7 +208,9 @@ def get_nearest_neighbors(
 def reduce_embedding_dim(
     self,
     new_column: Optional[str] = None,
-    method: str = "pca",  # or incremental_pca, kernel_pca, svd, umap
+    method: Literal[
+        "pca", "incremental_pca", "kernel_pca", "svd", "umap"
+    ] = "pca",
     n_dims: int = 50,
     embedding_field: str = "__embedding",
     **kwargs,
@@ -253,8 +255,15 @@ def reduce_embedding_dim(
             n_components=n_dims, kernel=kwargs.get("kernel", "rbf")
         )
         X_transformed = pca.fit_transform(X).tolist()
+        self.dataset = self.dataset.add_column(new_column, X_transformed)
     elif method == "svd":
-        raise NotImplementedError("SVD not yet implemented.")
+        X = np.array(self.dataset[embedding_field])
+        from sklearn.decomposition import TruncatedSVD
+
+        svd = TruncatedSVD(n_components=n_dims)
+        X_transformed = svd.fit_transform(X).tolist()
+        self.dataset = self.dataset.add_column(new_column, X_transformed)
+
     elif method == "umap":
         # warn that it will be slow if embedding dim is large
         if len(self.dataset[embedding_field][0]) >= 100:

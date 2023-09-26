@@ -4,7 +4,7 @@ import numpy as np
 import random
 from typing import Optional, Literal
 import numpy as np
-from sklearn.cluster import MiniBatchKMeans, KMeans, HDBSCAN, BisectingKMeans
+from sklearn.cluster import MiniBatchKMeans, KMeans, BisectingKMeans, HDBSCAN
 from collections import Counter
 import jinja2
 from .async_openai import run_chat_queries_with_openai
@@ -71,14 +71,35 @@ def cluster(
         self.cluster_centers = {
             i: model.cluster_centers_[i] for i in range(n_clusters)
         }
+    elif method == "hdbscan":
+        min_cluster_size = kwargs.get("min_cluster_size", 25)
+        model = HDBSCAN(
+            min_cluster_size=min_cluster_size,
+            min_samples=kwargs.get("min_samples", min_cluster_size),
+            alpha=kwargs.get("alpha", 1.0),
+            cluster_selection_method=kwargs.get(
+                "cluster_selection_method", "eom"
+            ),
+            leaf_size=kwargs.get("leaf_size", 40),
+            store_centers="medoid",
+        )
+        arr = np.array(self.dataset[embedding_field])
+        labels = model.fit_predict(arr)
+        self.cluster_ids = list(set(labels))
+        # cluster centers is a dict of id -> center
+        self.cluster_centers = {
+            i: model.medoids_[i] for i in range(max(self.cluster_ids))
+        }
+        self.dataset = self.dataset.add_column("__cluster", labels)
     else:
         raise ValueError(f"Unknown clustering method: {method}")
 
-    # add new column with cluster labels
-    self.dataset = self.dataset.map(
-        lambda x: {"__cluster": model.predict(x[embedding_field])},
-        batched=True,
-    )
+    if method != "hdbscan":
+        # add new column with cluster labels
+        self.dataset = self.dataset.map(
+            lambda x: {"__cluster": model.predict(x[embedding_field])},
+            batched=True,
+        )
 
 
 # preferred to filtering out the cluster, because it will remove the cluster from the cluster_ids list

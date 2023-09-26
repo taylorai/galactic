@@ -38,7 +38,9 @@ dependencies = [
     "joblib",
     "datasketch",
     "nest_asyncio",
-    "umap-learn"
+    "umap-learn",
+    "matplotlib",
+    "seaborn"
 ]
 
 [tool.black]
