@@ -5,7 +5,8 @@ GalacticDataset
 
 .. toctree::
    :maxdepth: 1
-   
+   :hidden:
+
    classifiers
    clustering
    embedding
