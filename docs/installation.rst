@@ -37,5 +37,5 @@ To upgrade to the latest version, you can use pip:
 
 .. code-block:: shell
 
-   pip install --upgrade galactic
+   pip install --upgrade galactic-ai
 
