@@ -33,7 +33,7 @@ If you do not see any errors, you are good to go. If you see an error, please re
 Upgrade install
 -------------------
 
-To upgrade to the latest version, you can use pip:
+Upgrade to the latest version:
 
 .. code-block:: shell
 
