@@ -30,7 +30,7 @@ Once you have installed Galactic, you can start using it by following the steps 
    print(ds)
 
    # Verify the first element of the dataset
-   first_element = galactic_dataset[0]
+   first_element = ds[0]
    print(first_element)
 
    # Verify the column names and length of the dataset
@@ -59,7 +59,7 @@ Set Rate Limits
     max_tokens_per_minute=350_000,
     max_requests_per_minute=4_000
    )
-   
+
 Additional Methods
 -------------------
 GalacticDataset class also includes various methods that allow you to load data, filter data, tag data, transform data, classify data, and more. Check out the GalacticDataset methods via the sidebar navigation.

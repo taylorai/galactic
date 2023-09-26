@@ -11,7 +11,7 @@ Galactic provides cleaning and curation tools for massive unstructured text data
 Galactic is made available under the Apache 2.0 license.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :caption: Contents:
 
    installation

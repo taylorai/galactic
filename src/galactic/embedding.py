@@ -162,7 +162,15 @@ def get_embeddings(
     embedding_field: str = "__embedding",
     backend: str = "auto",
 ):
-    """Get embeddings for a field in the dataset."""
+    """
+    Get embeddings for a field in the dataset.
+
+    .. code-block:: python
+    
+        # Replace "field_name1"
+        ds.get_embeddings(field="field_name1")
+
+    """
     self.initialize_embedding_model(backend=backend)
     if backend == "auto":
         backend = "cpu"
