@@ -15,6 +15,7 @@ logger = logging.getLogger("galactic")
 
 class EmbeddingModel:
     """Embedding model class."""
+
     def __init__(self, model_path, tokenizer_path, model_type, max_length=512):
         self.model_path = model_path
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)

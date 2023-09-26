@@ -35,6 +35,7 @@ def train_fasttext_classifier(
     random_seed: int = 42,
 ):
     """Train a fasttext classifier on the dataset."""
+
     def _preprocess(text):
         text = str(text)
         for fn in normalize:
