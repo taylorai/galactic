@@ -1,0 +1,4 @@
+sphinx==4.3.0
+sphinx-rtd-theme==1.0.0
+recommonmark==0.7.1
+sphinx-autodoc-typehints==1.12.0
