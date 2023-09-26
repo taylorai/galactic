@@ -13,6 +13,7 @@ from . import (
     embedding,
     clustering,
     minhash_lsh,
+    visualize,
 )
 
 # set up logging
@@ -67,12 +68,17 @@ class GalacticDataset:
     initialize_embedding_model = embedding.initialize_embedding_model
     get_embeddings = embedding.get_embeddings
     get_nearest_neighbors = embedding.get_nearest_neighbors
+    reduce_embedding_dim = embedding.reduce_embedding_dim
     ## clustering
     cluster = clustering.cluster
     remove_cluster = clustering.remove_cluster
+    ai_label_clusters = clustering.ai_label_clusters
     get_cluster_info = clustering.get_cluster_info
     semdedup = clustering.semdedup
     ## minhash lsh
+
+    ## visualizations
+    plot_embeddings = visualize.plot_embeddings
 
     def __post_init__(self):
         # add unique increaing int __id field if it doesn't already exist

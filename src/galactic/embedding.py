@@ -1,4 +1,5 @@
 from transformers import AutoTokenizer
+from typing import Optional
 import numpy as np
 import pandas as pd
 from huggingface_hub import hf_hub_download
@@ -151,41 +152,123 @@ def initialize_embedding_model(self, backend: str = "auto"):
         raise ValueError(f"Unknown backend: {backend}")
 
 
-def get_embeddings(self, field: str, backend: str = "auto"):
+def get_embeddings(
+    self,
+    input_field: str,
+    embedding_field: str = "__embedding",
+    backend: str = "auto",
+):
     self.initialize_embedding_model(backend=backend)
     if backend == "auto":
         backend = "cpu"
     if backend == "openai":
         embs = embed_texts_with_openai(
-            self.dataset[field], self.openai_api_key
+            self.dataset[input_field], self.openai_api_key
         )
         self.dataset = self.dataset.map(
-            lambda x, idx: {"__embedding": embs[idx]}, with_indices=True
+            lambda x, idx: {embedding_field: embs[idx]}, with_indices=True
         )
     else:
         self.dataset = self.dataset.map(
-            lambda x: {f"__embedding": self.model(x[field])}
+            lambda x: {embedding_field: self.model(x[input_field])}
         )
     self.emb_matrix = np.array(self.dataset["__embedding"])
-    logger.info(f"Created embeddings on field '{field}'")
+    logger.info(f"Created embeddings on field '{input_field}'")
     return self
 
 
-def get_nearest_neighbors(self, query: Union[str, np.ndarray], k: int = 5):
-    if "__embedding" not in self.dataset.column_names:
+def get_nearest_neighbors(
+    self,
+    query: Union[str, np.ndarray, list[float]],
+    k: int = 5,
+    embedding_field: str = "__embedding",
+):
+    if embedding_field not in self.dataset.column_names:
         raise ValueError(
-            "You must call get_embeddings() before calling get_nearest_neighbors(). If your dataset already has an embeddings column, make sure it's called '__embeddings'."
+            "You must call get_embeddings() before calling get_nearest_neighbors(). If your dataset already has an embeddings column and it's not '__embeddings', pass it as the 'embedding_field' argument."
         )
     if not hasattr(self, "emb_matrix"):
         self.emb_matrix = np.array(self.dataset["__embedding"])
     if not hasattr(self, "model"):
-        self.get_embedding_model()
+        self.initialize_embedding_model()
     if isinstance(query, str):
         query = self.model(query)
     scores = np.dot(self.emb_matrix, query)
     top_k = list(np.argsort(scores)[::-1][:k])
     top_k_items = self.dataset.select(top_k)
     return top_k_items.to_list()
+
+
+def reduce_embedding_dim(
+    self,
+    new_column: Optional[str] = None,
+    method: str = "pca",  # or incremental_pca, kernel_pca, svd, umap
+    n_dims: int = 50,
+    embedding_field: str = "__embedding",
+    **kwargs,
+):
+    n_features = len(self.dataset[embedding_field][0])
+    if new_column is None:
+        new_column = f"{embedding_field}_{method}_{n_dims}"
+    if method == "pca":
+        X = np.array(self.dataset[embedding_field])
+        from sklearn.decomposition import PCA
+
+        pca = PCA(n_components=n_dims)
+        X_transformed = pca.fit_transform(X).tolist()
+        self.dataset = self.dataset.add_column(new_column, X_transformed)
+    elif method == "incremental_pca":
+        from sklearn.decomposition import IncrementalPCA
+
+        pca = IncrementalPCA(n_components=n_dims)
+        batch_size = kwargs.get("batch_size", 5 * n_features)
+
+        # fit the PCA on batches of the dataset
+        def _fit_batch(batch):
+            pca.partial_fit(batch[embedding_field])
+            return None
+
+        self.dataset.map(
+            _fit_batch,
+            batched=True,
+            batch_size=batch_size,
+        )
+        # transform the dataset
+        self.dataset = self.dataset.map(
+            lambda x: {new_column: pca.transform(x[embedding_field]).tolist()},
+            batched=True,
+            batch_size=batch_size,
+        )
+    elif method == "kernel_pca":
+        X = np.array(self.dataset[embedding_field])
+        from sklearn.decomposition import KernelPCA
+
+        pca = KernelPCA(
+            n_components=n_dims, kernel=kwargs.get("kernel", "rbf")
+        )
+        X_transformed = pca.fit_transform(X).tolist()
+    elif method == "svd":
+        raise NotImplementedError("SVD not yet implemented.")
+    elif method == "umap":
+        # warn that it will be slow if embedding dim is large
+        if len(self.dataset[embedding_field][0]) >= 100:
+            logger.info(
+                "Embedding dimension is large, which can slow UMAP down a lot, even for small datasets. You might consider PCA first with e.g. n_dims=50, followed by UMAP."
+            )
+        import umap
+
+        reducer = umap.UMAP(n_components=n_dims, **kwargs)
+        X = np.array(self.dataset[embedding_field])
+        X_transformed = reducer.fit_transform(X).tolist()
+        self.dataset = self.dataset.add_column(new_column, X_transformed)
+    else:
+        raise ValueError(f"Unknown method: {method}")
+
+    logger.info(
+        f"Reduced embeddings to {n_dims} dimensions using {method}. New embeddings stored in column '{new_column}'"
+    )
+
+    return self
 
 
 # finetune embeddings as in https://github.com/openai/openai-cookbook/blob/main/examples/Customizing_embeddings.ipynb

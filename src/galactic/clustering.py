@@ -6,6 +6,8 @@ from typing import Optional
 import numpy as np
 from sklearn.cluster import MiniBatchKMeans, KMeans
 from collections import Counter
+import jinja2
+from .async_openai import run_chat_queries_with_openai
 
 import logging
 
@@ -16,17 +18,26 @@ def cluster(
     self,
     n_clusters: int,
     method: str = "kmeans",
-    batch_size: int = 1024,
-    n_epochs: int = 5,
+    embedding_field: str = "__embedding",
+    # batch_size: int = 1024, # These should be kwargs
+    # n_epochs: int = 5,
+    **kwargs,
 ):
-    if "__embedding" not in self.dataset.column_names:
+    if embedding_field not in self.dataset.column_names:
         raise ValueError(
-            "You must call get_embeddings() before calling cluster(). If your dataset already has an embeddings column, make sure it's named '__embeddings'."
+            "You must call get_embeddings() before calling cluster(). If your dataset already has an embeddings column, pass it as 'embedding_field' argument."
+        )
+    # check if emb dimension is large
+    if len(self.dataset[embedding_field][0]) >= 384:
+        logger.info(
+            "Embedding dimension is large, which is fine! But consider also experimenting with dimensionality reduction before clustering."
         )
     if method == "minibatch_kmeans":
-        model = MiniBatchKMeans(n_clusters=n_clusters, batch_size=batch_size)
-        for epoch in range(n_epochs):
-            logger.info(f"Epoch {epoch+1}/{n_epochs}")
+        model = MiniBatchKMeans(
+            n_clusters=n_clusters, batch_size=kwargs.get("batch_size", 1024)
+        )
+        for epoch in range(kwargs.get("n_epochs", 5)):
+            logger.info(f"Epoch {epoch+1}/{kwargs.get('n_epochs', 5)}")
             self.dataset.map(
                 lambda x: model.partial_fit(np.array(x["__embedding"])),
             )
@@ -62,6 +73,60 @@ def remove_cluster(self, cluster: int):
     del self.cluster_centers[cluster]
 
 
+def ai_label_clusters(
+    self,
+    fields: list[str],
+    new_column: str = "__cluster_label",
+    n_examples: int = 10,
+    selection: str = "random",  # or nearest
+    embedding_field: str = "__embedding",
+    prompt: Optional[str] = None,  # jinja2 template
+):
+    if not prompt:
+        # Default Jinja2 template
+        prompt = """
+        Please identify a single shared topic or theme among the following examples in a few words. It's ok if there are a small minority of examples that don't fit with the theme, but if there's no a clear shared topic or theme, just say "No shared topic or theme".
+        
+        {% for example in examples %}
+            ### Example {{ loop.index }}
+            {% for field in fields %}
+                - {{ field }}: {{ example[field] }}
+            {% endfor %}
+        {% endfor %}
+        
+        Now, state the single topic or theme in 3-10 words, no long lists:
+        """.strip()
+    template = jinja2.Template(prompt)
+    queries = []
+    for cluster_id in self.cluster_centers.keys():
+        cluster_center = self.cluster_centers[cluster_id]
+        cluster = self.dataset.filter(
+            lambda x: x["__cluster"] == cluster_id
+        ).select_columns(fields + [embedding_field])
+        if len(cluster) < n_examples:
+            examples = list(cluster.select_columns(fields))
+        elif selection == "nearest":
+            emb_matrix = np.array(cluster[embedding_field])
+            similarities = np.dot(emb_matrix, cluster_center)
+            top_k = list(np.argsort(similarities)[::-1][:n_examples])
+            examples = list(cluster.select(top_k).select_columns(fields))
+        elif selection == "random":
+            examples = random.choices(
+                list(cluster.select_columns(fields)), k=n_examples
+            )
+        else:
+            raise ValueError(f"Unknown selection method: {selection}")
+
+        prompt = template.render(examples=examples, fields=fields)
+        queries.append(prompt)
+
+    responses = run_chat_queries_with_openai(queries, self.openai_api_key)
+    self.dataset = self.dataset.map(
+        lambda x: {new_column: responses[x["__cluster"]]},
+    )
+    return self
+
+
 def get_cluster_info(self, n_neighbors: int = 3, field: str = None):
     """
     Goal is to do some kind of unsupervised domain discovery thing here to figure out what the clusters mean.
@@ -80,7 +145,7 @@ def get_cluster_info(self, n_neighbors: int = 3, field: str = None):
     # for each one, get the 3 nearest neighbors
     for id, emb in self.cluster_centers.items():
         print(f"Cluster {id} ({counts[id]} items)")
-        nn = self.get_nearest_neighbors(emb, k=3)
+        nn = self.get_nearest_neighbors(emb, k=n_neighbors)
         if field is not None:
             for n in nn:
                 print("\t" + n[field])
