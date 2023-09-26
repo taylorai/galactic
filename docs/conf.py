@@ -35,6 +35,7 @@ highlight_language = "python"
 
 
 html_theme_options = {
+    "show_navbar_depth": 2,
     "repository_url": "https://github.com/taylorai/galactic",
     "use_issues_button": True,
     "icon_links": [
