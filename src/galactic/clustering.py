@@ -2,9 +2,9 @@ import datasets
 import networkx as nx
 import numpy as np
 import random
-from typing import Optional
+from typing import Optional, Literal
 import numpy as np
-from sklearn.cluster import MiniBatchKMeans, KMeans
+from sklearn.cluster import MiniBatchKMeans, KMeans, HDBSCAN, BisectingKMeans
 from collections import Counter
 import jinja2
 from .async_openai import run_chat_queries_with_openai
@@ -17,10 +17,10 @@ logger = logging.getLogger("galactic")
 def cluster(
     self,
     n_clusters: int,
-    method: str = "kmeans",
+    method: Literal[
+        "kmeans", "minibatch_kmeans", "bisecting_kmeans", "hdbscan"
+    ] = "kmeans",
     embedding_field: str = "__embedding",
-    # batch_size: int = 1024, # These should be kwargs
-    # n_epochs: int = 5,
     **kwargs,
 ):
     """Cluster the dataset using the specified method."""
@@ -40,7 +40,7 @@ def cluster(
         for epoch in range(kwargs.get("n_epochs", 5)):
             logger.info(f"Epoch {epoch+1}/{kwargs.get('n_epochs', 5)}")
             self.dataset.map(
-                lambda x: model.partial_fit(np.array(x["__embedding"])),
+                lambda x: model.partial_fit(np.array(x[embedding_field])),
             )
         self.cluster_ids = list(range(n_clusters))
         # cluster centers is a dict of id -> center
@@ -57,7 +57,15 @@ def cluster(
         self.cluster_centers = {
             i: model.cluster_centers_[i] for i in range(n_clusters)
         }
-    else:
+    elif method == "bisecting_kmeans":
+        model = BisectingKMeans(
+            n_clusters=n_clusters,
+            init="k-means++",
+            n_init=1,
+            bisecting_strategy="largest_cluster",
+        )
+        arr = np.array(self.dataset["__embedding"])
+
         raise ValueError(f"Unknown clustering method: {method}")
 
     # add new column with cluster labels
