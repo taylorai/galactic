@@ -4,3 +4,4 @@ recommonmark
 sphinx-autodoc-typehints
 sphinx_copybutton
 sphinx-book-theme==1.0.1
+sphinx-favicon
