@@ -16,7 +16,7 @@ Galactic is made available under the Apache 2.0 license.
 
    installation
    quickstart
-   api
+   GalacticDataset
 
 Indices and tables
 ==================
