@@ -36,7 +36,7 @@ def train_fasttext_classifier(
 ):
     """
     Trains a fasttext classifier on the dataset provided to the instance.
-    
+
     Args:
         self: The instance of the class.
         model_name (str): The name of the model to be saved.
@@ -52,6 +52,7 @@ def train_fasttext_classifier(
         training_duration (int, optional): The duration in seconds for the fasttext autotune. Defaults to 300.
         random_seed (int, optional): Seed for reproducing results. Defaults to 42.
     """
+
     def _preprocess(text):
         text = str(text)
         for fn in normalize:
@@ -122,7 +123,7 @@ def train_embeddings_classifier(
 ):
     """
     Trains a classifier on the dataset using embeddings.
-    
+
     Args:
         self: The instance of the class.
         model_name (str): The name of the model to be saved.
@@ -192,7 +193,7 @@ def ai_classifier(
 ):
     """
     Classify a field using OpenAI's API or a HF zero-shot classifier to generate a new column based on an existing column.
-    
+
     Args:
         self: The instance of the class.
         new_column (str): Name of the new column to be added to the dataset.
@@ -343,7 +344,7 @@ def fasttext_classifier(
 ):
     """
     Classify a field using a trained fastText model to generate a new column based on an existing column.
-    
+
     Args:
         self: The instance of the class.
         fasttext_model (str): The path to the trained fastText model file.

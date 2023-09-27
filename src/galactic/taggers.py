@@ -116,10 +116,10 @@ def calc_perplexity(
 ):
     """
     Calculate the perplexity-per-byte of the specified field.
-    
+
     .. note::
 
-        You must install KenLM to calculate perplexity using the KenLM model from https://github.com/kpu/kenlm. 
+        You must install KenLM to calculate perplexity using the KenLM model from https://github.com/kpu/kenlm.
         To install, run ``pip install https://github.com/kpu/kenlm/archive/master.zip``.
 
     .. code-block:: python

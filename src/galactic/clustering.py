@@ -40,7 +40,6 @@ def cluster(
 
     """
 
-
     if embedding_field not in self.dataset.column_names:
         raise ValueError(
             "You must call get_embeddings() before calling cluster(). If your dataset already has an embeddings column, pass it as 'embedding_field' argument."
@@ -191,7 +190,6 @@ def ai_label_clusters(
     selection: Literal["random", "nearest"] = "random",
     prompt: Optional[str] = None,  # jinja2 template
 ):
-    
     """
     Labels the clusters using AI based on the given fields and prompt template.
 
@@ -343,7 +341,6 @@ def get_duplicates(
     embedding_field: str = "__embedding",
     dedup_strategy: Literal["random", "nearest", "furthest"] = "random",
 ):
-
     """
     Retrieves duplicates within a specified cluster based on a threshold.
 

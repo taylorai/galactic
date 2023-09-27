@@ -13,19 +13,19 @@ logger = logging.getLogger("galactic")
 def trim_whitespace(self, fields: Sequence[str], inplace: bool = True):
     """
     Trim Unicode-defined whitespace at the beginning and end of specified fields.
-    
+
     :param fields: List of fields to trim.
     :type fields: Sequence[str]
     :param inplace: Whether to perform the operation in-place, defaults to True
     :type inplace: bool, optional
     :return: Modified GalacticDataset instance.
     :rtype: GalacticDataset
-        
+
     .. code-block:: python
-    
+
         dataset = GalacticDataset(…)
         dataset.trim_whitespace(fields=['column1', 'column2'])
-    
+
     """
 
     def trim_(sample):
@@ -60,7 +60,7 @@ def unicode_normalize(
 ):
     """
     Apply Unicode normalization to specified fields. This is useful as a pre-processing step for ML training.
-    
+
     :param fields: List of fields to normalize.
     :type fields: Sequence[str]
     :param form: Unicode normalization form, defaults to "NFC"
@@ -69,12 +69,12 @@ def unicode_normalize(
     :type inplace: bool, optional
     :return: Modified GalacticDataset instance if inplace is True, else a new instance.
     :rtype: GalacticDataset
-        
+
     .. code-block:: python
-    
+
         dataset = GalacticDataset(…)
         dataset.unicode_normalize(fields=['column1', 'column2'], form='NFC')
-    
+
     """
     # make sure fields exist and are text fields
     for field in fields:
@@ -122,7 +122,7 @@ def ai_column(
 ):
     """
     Use OpenAI's API to generate a new column based on an existing column.
-    
+
     :param new_column: Name of the new column.
     :type new_column: str
     :param prompt: Prompt template (Jinja2) to use for the API request.
@@ -135,14 +135,14 @@ def ai_column(
     :type system_prompt: str, optional
     :return: Modified GalacticDataset instance.
     :rtype: GalacticDataset
-    
+
     :raises ValueError: If a specified field is not found in the dataset or if the new_column already exists in the dataset.
-        
+
     .. code-block:: python
-    
+
         dataset = GalacticDataset(…)
         dataset.ai_column(new_column='ai_column', prompt='{{column1}} is related to {{column2}}', depends_on=['column1', 'column2'])
-    
+
     """
     for field in depends_on:
         if field not in self.dataset.column_names:

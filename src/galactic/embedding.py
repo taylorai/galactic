@@ -16,7 +16,7 @@ logger = logging.getLogger("galactic")
 class EmbeddingModel:
     """
     This class provides methods to load embedding models and generate embeddings.
-    
+
     :param model_path: Path to the model.
     :type model_path: str
     :param tokenizer_path: Path to the tokenizer.
@@ -25,11 +25,11 @@ class EmbeddingModel:
     :type model_type: str
     :param max_length: Maximum length of tokenization.
     :type max_length: int, optional, default=512
-    
+
     Example:
-    
+
     .. code-block:: python
-    
+
         model = EmbeddingModel(model_path='path_to_model', tokenizer_path='path_to_tokenizer', model_type='onnx', max_length=512)
     """
 
@@ -52,16 +52,16 @@ class EmbeddingModel:
     def split_and_tokenize(self, text):
         """
         Tokenize the text and pad it to be a multiple of max_length.
-        
+
         :param text: The input text to be tokenized.
         :type text: str
         :return: Returns a dictionary containing tokenized and padded 'input_ids', 'attention_mask' and 'token_type_ids'.
         :rtype: Dict[str, numpy.ndarray]
-        
+
         Example:
-        
+
         .. code-block:: python
-        
+
             tokenized_text = model.split_and_tokenize('sample text')
         """
         # first make into tokens
@@ -126,18 +126,18 @@ class EmbeddingModel:
 def embed_with_openai(text: str, key: str):
     """
     Embeds a single text with OpenAI API.
-    
+
     :param text: The input text to be embedded.
     :type text: str
     :param key: The API key for OpenAI.
     :type key: str
     :return: The normalized averaged embeddings.
     :rtype: numpy.ndarray
-    
+
     Example:
-    
+
     .. code-block:: python
-    
+
         embedding = embed_with_openai('sample text', 'api_key')
     """
     encoding = tiktoken.get_encoding("cl100k_base")
@@ -161,15 +161,15 @@ def embed_with_openai(text: str, key: str):
 def initialize_embedding_model(self, backend: str = "auto"):
     """
     Initializes the embedding model based on the backend.
-    
+
     :param backend: The backend used for embedding. Options: 'auto', 'cpu', 'gpu', 'openai'.
     :type backend: str, default='auto'
     :raises ValueError: Raises an exception if the backend is 'openai' but openai_api_key is not set, or if the backend is unknown.
-    
+
     Example:
-    
+
     .. code-block:: python
-    
+
         initialize_embedding_model('cpu')
     """
     # if auto, then select intelligently
