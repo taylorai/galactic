@@ -34,8 +34,24 @@ def train_fasttext_classifier(
     training_duration: int = 300,
     random_seed: int = 42,
 ):
-    """Train a fasttext classifier on the dataset."""
-
+    """
+    Trains a fasttext classifier on the dataset provided to the instance.
+    
+    Args:
+        self: The instance of the class.
+        model_name (str): The name of the model to be saved.
+        save_dir (str): The directory where the model should be saved.
+        input_field (str): The field name from the dataset to be used as input.
+        label_field (str): The field name from the dataset to be used as label.
+        validation_split (float, optional): The proportion of the dataset to include in the validation split. Defaults to 0.1.
+        test_split (float, optional): The proportion of the dataset to include in the test split. Defaults to 0.1.
+        normalize (list[str], optional): List of normalization to apply to the text. Defaults to ["lower", "strip"].
+        split_punctuation (bool, optional): Whether to split the text by punctuation. Defaults to True.
+        replace_newlines_with (str, optional): String to replace newlines with in the text. Defaults to " __newline__ ".
+        target_model_size (str, optional): The desired size of the fasttext model. Defaults to "2M".
+        training_duration (int, optional): The duration in seconds for the fasttext autotune. Defaults to 300.
+        random_seed (int, optional): Seed for reproducing results. Defaults to 42.
+    """
     def _preprocess(text):
         text = str(text)
         for fn in normalize:
@@ -104,7 +120,20 @@ def train_embeddings_classifier(
     test_split=0.1,
     random_seed: int = 42,
 ):
-    """Train a classifier on the dataset using the embeddings."""
+    """
+    Trains a classifier on the dataset using embeddings.
+    
+    Args:
+        self: The instance of the class.
+        model_name (str): The name of the model to be saved.
+        save_dir (str): The directory where the model should be saved.
+        label_field (str): The field name from the dataset to be used as label.
+        model_type (str, optional): The type of model to train. Either "svm" or "logistic". Defaults to "svm".
+        input_field (str, optional): The field name from the dataset to be used as input. Defaults to "__embedding".
+        validation_split (float, optional): The proportion of the dataset to include in the validation split. Defaults to 0.1.
+        test_split (float, optional): The proportion of the dataset to include in the test split. Defaults to 0.1.
+        random_seed (int, optional): Seed for reproducing results. Defaults to 42.
+    """
     if "__embedding" not in input_field:
         logger.warning(
             "This is designed to use the embeddings (typically '__embedding') as input. I hope you know what you're doing..."
@@ -162,17 +191,15 @@ def ai_classifier(
     backend="openai",
 ):
     """
-    Use OpenAI's API or a HF zero-shot classifier to generate a new column based on an existing column.
+    Classify a field using OpenAI's API or a HF zero-shot classifier to generate a new column based on an existing column.
+    
     Args:
-        name (str): Name of the new column.
-        field (str): Name of the field to use for classification. Can be None if backend is 'embeddings'.
-        classes (List[str] or dict[str, str]): Classes to classify into. Can be just a list of labels, or a dict of label: description.
-        If provided, descriptions will be used for a) prompting API model if backend = 'openai', b) embedding if backend = "embeddings",
-        c) zero-shot classification if backend = "huggingface".
-        prompt (str): Prompt template (Jinja2) to use for the API request, with a template slot for the field to classify.
-        Only used if backend = 'openai'. If none provided, a basic default prompt will be used.
-        default prompt will be used.
-        backend (str): Which backend to use. Currently supports 'embeddings', 'openai' and 'huggingface'.
+        self: The instance of the class.
+        new_column (str): Name of the new column to be added to the dataset.
+        field (Optional[str]): Name of the field to use for classification. Can be None if backend is 'embeddings'.
+        classes (Union[list[str], dict[str, str]]): Classes to classify into. Can be a list of labels or a dict of label: description.
+        prompt (Optional[str], optional): Prompt template (Jinja2) to use for the API request, with a template slot for the field to classify. Defaults to None.
+        backend (str, optional): Which backend to use. Currently supports 'embeddings', 'openai', and 'huggingface'. Defaults to "openai".
     """
     if backend == "embeddings":
         # warn if field is specified that embeddings ignores the field
@@ -314,7 +341,16 @@ def fasttext_classifier(
     split_punctuation: bool = True,
     replace_newlines_with: str = " __newline__ ",
 ):
-    """Use a fasttext model to classify a field."""
+    """
+    Classify a field using a trained fastText model to generate a new column based on an existing column.
+    
+    Args:
+        self: The instance of the class.
+        fasttext_model (str): The path to the trained fastText model file.
+        new_column (str): Name of the new column to be added to the dataset.
+        field (Optional[str]): Name of the field to use for classification. Can be None if the fastText model is trained on embeddings.
+        k (int, optional): Number of labels to predict. Defaults to 1.
+    """
     # make sure the input field is a string
     if self.dataset.features[field].dtype != "string":
         raise ValueError(f"Field {field} is not a string field.")

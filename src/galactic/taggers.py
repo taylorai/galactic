@@ -114,7 +114,20 @@ def calc_perplexity(
     language: Optional[str] = "en",
     dataset: Optional[str] = "wikipedia",
 ):
-    """Calculate the perplexity-per-byte of the specified field."""
+    """
+    Calculate the perplexity-per-byte of the specified field.
+    
+    .. note::
+
+        You must install KenLM to calculate perplexity using the KenLM model from https://github.com/kpu/kenlm. 
+        To install, run ``pip install https://github.com/kpu/kenlm/archive/master.zip``.
+
+    .. code-block:: python
+
+        # Replace "field_name1"
+        ds.calc_perplexity(field="field_name1")
+
+    """
     # make sure field exists and is a string field
     if field not in self.dataset.features:
         raise ValueError(f"Field {field} not found in dataset.")
@@ -203,6 +216,12 @@ def detect_pii(self, fields: Sequence[str]):
 def count_tokens(self, fields: Sequence[str], tokenizer: Optional[str] = None):
     """
     Count the number of tokens in the specified fields.
+
+    .. code-block:: python
+
+        # Replace "field_name1" and "field_name2" with your fields
+        ds.count_tokens(fields=["field_name1, field_name2"])
+
     Args:
         fields (List[str]): List of fields to count tokens in.
         tokenizer (Callable): Tokenizer function to use. Defaults to None, which uses bytes.

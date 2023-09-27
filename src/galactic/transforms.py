@@ -13,8 +13,19 @@ logger = logging.getLogger("galactic")
 def trim_whitespace(self, fields: Sequence[str], inplace: bool = True):
     """
     Trim Unicode-defined whitespace at the beginning and end of specified fields.
-    Args:
-        fields (List[str]): List of fields to trim.
+    
+    :param fields: List of fields to trim.
+    :type fields: Sequence[str]
+    :param inplace: Whether to perform the operation in-place, defaults to True
+    :type inplace: bool, optional
+    :return: Modified GalacticDataset instance.
+    :rtype: GalacticDataset
+        
+    .. code-block:: python
+    
+        dataset = GalacticDataset(…)
+        dataset.trim_whitespace(fields=['column1', 'column2'])
+    
     """
 
     def trim_(sample):
@@ -49,8 +60,21 @@ def unicode_normalize(
 ):
     """
     Apply Unicode normalization to specified fields. This is useful as a pre-processing step for ML training.
-    Note that NFKC normalization mangles certain mathematical expressions like exponents, so you might prefer NFC for that.
-    See Appendix A.4 of the Gopher paper: https://arxiv.org/pdf/2112.11446.pdf
+    
+    :param fields: List of fields to normalize.
+    :type fields: Sequence[str]
+    :param form: Unicode normalization form, defaults to "NFC"
+    :type form: str, optional
+    :param inplace: Whether to perform the operation in-place, defaults to True
+    :type inplace: bool, optional
+    :return: Modified GalacticDataset instance if inplace is True, else a new instance.
+    :rtype: GalacticDataset
+        
+    .. code-block:: python
+    
+        dataset = GalacticDataset(…)
+        dataset.unicode_normalize(fields=['column1', 'column2'], form='NFC')
+    
     """
     # make sure fields exist and are text fields
     for field in fields:
@@ -98,11 +122,27 @@ def ai_column(
 ):
     """
     Use OpenAI's API to generate a new column based on an existing column.
-    Args:
-        name (str): Name of the new column.
-        prompt (str): Prompt template (Jinja2) to use for the API request.
-        system_prompt (str): System instructions (optional, same for every request).
-        depends_on (List[str]): List of fields needed to fill in the template.
+    
+    :param new_column: Name of the new column.
+    :type new_column: str
+    :param prompt: Prompt template (Jinja2) to use for the API request.
+    :type prompt: str
+    :param depends_on: List of fields needed to fill in the template, defaults to an empty list.
+    :type depends_on: list[str], optional
+    :param normalize: List of string methods to apply for normalization, defaults to ["strip", "lower"]
+    :type normalize: list[str], optional
+    :param system_prompt: System instructions (optional, same for every request), defaults to None
+    :type system_prompt: str, optional
+    :return: Modified GalacticDataset instance.
+    :rtype: GalacticDataset
+    
+    :raises ValueError: If a specified field is not found in the dataset or if the new_column already exists in the dataset.
+        
+    .. code-block:: python
+    
+        dataset = GalacticDataset(…)
+        dataset.ai_column(new_column='ai_column', prompt='{{column1}} is related to {{column2}}', depends_on=['column1', 'column2'])
+    
     """
     for field in depends_on:
         if field not in self.dataset.column_names:

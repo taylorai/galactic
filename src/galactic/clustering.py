@@ -25,7 +25,22 @@ def cluster(
     overwrite: bool = False,
     **kwargs,
 ):
-    """Cluster the dataset using the specified method."""
+    """
+    Cluster the dataset using the specified method.
+
+    .. code-block:: python
+
+        # Cluster your dataset into 10 clusters using minibatch k-means
+        ds.cluster(n_clusters=10)
+
+    :param n_clusters: Required. The number of clusters to form.
+    :param method: Optional. The clustering method to use. Default = ``kmeans``.
+    :param embedding_field: Optional. Specify a name for the field to use for clustering. Default = ``__embedding``.
+    :param kwargs: Optional. Additional keyword arguments to pass to the clustering algorithm.
+
+    """
+
+
     if embedding_field not in self.dataset.column_names:
         raise ValueError(
             "You must call get_embeddings() before calling cluster(). If your dataset already has an embeddings column, pass it as 'embedding_field' argument."
@@ -176,6 +191,24 @@ def ai_label_clusters(
     selection: Literal["random", "nearest"] = "random",
     prompt: Optional[str] = None,  # jinja2 template
 ):
+    
+    """
+    Labels the clusters using AI based on the given fields and prompt template.
+
+    .. code-block:: python
+
+        # Example usage:
+        ds.ai_label_clusters(fields=['field1', 'field2'], selection='nearest')
+
+    :param fields: List of fields used to identify clusters.
+    :param new_column: Optional. Name of the new column where the cluster labels will be stored. Defaults to '__cluster_label'.
+    :param n_examples: Optional. Number of examples to consider for labeling. Defaults to 10.
+    :param selection: Optional. Strategy to select examples for labeling. Can be 'random' or 'nearest'. Defaults to 'random'.
+    :param embedding_field: Optional. Name of the embedding field to be used. Defaults to '__embedding'.
+    :param prompt: Optional. Jinja2 template string to be used as the prompt for labeling.
+    :return: The modified object with labeled clusters.
+    """
+
     if not prompt:
         # Default Jinja2 template
         prompt = (
@@ -234,7 +267,16 @@ def get_cluster_info(
     verbose: bool = True,
 ):
     """
-    Goal is to do some kind of unsupervised domain discovery thing here to figure out what the clusters mean.
+    Retrieves information regarding clusters and their nearest neighbors.
+
+    .. code-block:: python
+
+        # Example usage:
+        ds.get_cluster_info(n_neighbors=5, field='title')
+
+    :param n_neighbors: Number of nearest neighbors to be retrieved for each cluster. Defaults to 3.
+    :param field: Optional specific field to be printed from the neighbors.
+    :raises ValueError: If cluster() or get_embeddings() methods are not called prior to calling this method.
     """
     result = []
     if (
@@ -301,7 +343,22 @@ def get_duplicates(
     embedding_field: str = "__embedding",
     dedup_strategy: Literal["random", "nearest", "furthest"] = "random",
 ):
-    """Get duplicates in a cluster."""
+
+    """
+    Retrieves duplicates within a specified cluster based on a threshold.
+
+    .. code-block:: python
+
+        # Example usage:
+        duplicates = get_duplicates(cluster=ds, threshold=0.8, strategy='nearest')
+
+    :param cluster: The dataset cluster to be analyzed for duplicates.
+    :param threshold: Similarity threshold to consider two items as duplicates.
+    :param strategy: Strategy to select duplicates, can be 'random', 'nearest', or 'furthest'. Defaults to 'random'.
+    :raises ValueError: If an unknown strategy is provided.
+    :return: List of identified duplicate items within the cluster.
+    """
+
     duplicates = []
     num_points = len(cluster)
     if emb_matrix is None:
@@ -346,7 +403,21 @@ def tune_threshold(
     embedding_field: str = "__embedding",
     dedup_strategy: Literal["random", "nearest", "furthest"] = "random",
 ):
-    """Tune the threshold for a cluster."""
+    """
+    Tunes the threshold for identifying duplicates within a cluster to achieve a target retention rate.
+
+    .. code-block:: python
+
+        # Example usage:
+        threshold = tune_threshold(cluster=ds, target_retention=0.9)
+
+    :param cluster: The dataset cluster to be analyzed.
+    :param target_retention: Target retention rate to achieve.
+    :param tol: Tolerance for the difference between achieved and target retention rate. Defaults to 0.01.
+    :param max_iter: Maximum number of iterations for tuning. Defaults to 30.
+    :return: The tuned threshold value.
+    """
+
     tol = max(tol, 1 / len(cluster))
     emb_matrix = np.array(cluster[embedding_field])
     similarities = np.dot(emb_matrix, emb_matrix.T)
@@ -399,7 +470,6 @@ def semdedup(
     inplace=True,
 ):
     """Remove semantic near-duplicates from the dataset."""
-    print("It's semdedup time! Using embedding field", embedding_field)
     if target_retention is None and threshold is None:
         raise ValueError(
             "You must specify either target_retention or threshold."

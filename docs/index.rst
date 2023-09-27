@@ -6,12 +6,12 @@
 Welcome to Galactic
 =======================================
 
-Galactic provides cleaning and curation tools for massive unstructured text datasets. It's designed to help you curate fine-tuning datasets, create document collections for retrieval-augmented generation (RAG), and even perform deduplication of web-scale datasets for LLM pre-training.
+Galactic provides cleaning and curation tools for massive unstructured text datasets. Galactic helps you curate fine-tuning datasets, create document collections for retrieval-augmented generation (RAG), perform deduplication of web-scale datasets for LLM pre-training, and more.
 
 Galactic is made available under the Apache 2.0 license.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :caption: Contents:
 
    installation
