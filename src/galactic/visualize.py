@@ -43,7 +43,7 @@ def plot_embeddings(
 
         for i, label in enumerate(unique_labels):
             idx = [j for j, x in enumerate(labels) if x == label]
-            sns.scatterplot(
+            ax = sns.scatterplot(
                 x=np.array(x_coords)[idx],
                 y=np.array(y_coords)[idx],
                 color=palette[i],
@@ -51,7 +51,17 @@ def plot_embeddings(
                 s=dot_size,
             )
 
-        plt.legend(title=color_by, fontsize="smaller", markerscale=2)
+        # Move legend outside the plot
+        plt.legend(
+            title=color_by,
+            fontsize="small",
+            markerscale=2,
+            bbox_to_anchor=(1, 1),
+            loc="upper left",
+        )
+
+        plt.tight_layout(rect=[0, 0, 0.85, 1])
+
     else:
         sns.scatterplot(x=x_coords, y=y_coords, s=dot_size)
 

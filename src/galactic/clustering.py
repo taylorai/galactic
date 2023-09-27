@@ -136,6 +136,20 @@ def cluster(
         raise ValueError(f"Unknown clustering method: {method}")
 
 
+def recompute_cluster_centers(
+    self,
+    cluster_field: str = "__cluster",
+    embedding_field: str = "__embedding",
+    method: Literal["centroid", "medoid"] = "centroid",
+):
+    """
+    Re-compute centers and store them in self.cluster_centers. There are two main reasons to do this:
+    1. You've deduplicated or sparsified clusters, so their centers have moved, or
+    2. You've re-loaded the data from file, so the centers are no longer in memory.
+    """
+    pass
+
+
 # preferred to filtering out the cluster, because it will remove the cluster from the cluster_ids list
 def remove_cluster(self, cluster_field: str, cluster_id: int):
     """Remove a cluster from the dataset."""
@@ -483,7 +497,7 @@ def semdedup(
 
     if target_retention is not None:
         tuning_clusters = random.choices(
-            list(clusters.keys()), k=num_tuning_clusters
+            list(set(clusters.keys())), k=num_tuning_clusters
         )
         # tune threshold
         logger.info(f"Tuning threshold on {num_tuning_clusters} clusters...")

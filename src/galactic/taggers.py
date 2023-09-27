@@ -299,7 +299,7 @@ def ai_tagger(
                 token2cls[t2] = cls
         logit_bias = {t: 100 for t in token2cls.keys()}
 
-        for tag in tags:
+        for idx, tag in enumerate(tags):
             logger.info(f"Tagging with tag {tag}...")
             # construct prompt template
             if prompt is None:
@@ -343,9 +343,12 @@ def ai_tagger(
             self.dataset = self.dataset.add_column(
                 name=f"__ai_tag__{tag.replace(' ', '_')}", column=labels
             )
-            logger.info(
-                f"Tagged with tag {tag}. Pausing to cool down before issuing more requests..."
-            )
-            time.sleep(30)
+            logger.info(f"Tagged with tag {tag}.")
+            # if not the last tag, cool down for 30 seconds
+            if idx < len(tags) - 1:
+                logger.info(
+                    f"Cooling down for 30 seconds before tagging with next tag."
+                )
+                time.sleep(30)
 
     return self

@@ -105,28 +105,6 @@ class GalacticDataset:
             if len(self.dataset["__id"]) != len(set(self.dataset["__id"])):
                 raise ValueError("Dataset contains duplicate __id values.")
 
-        # if we loaded something that already has clusters/embeddings, but no cluster centers, we can set them
-        if (
-            "__cluster" in self.dataset.column_names
-            and "__embedding" in self.dataset.column_names
-            and self.cluster_centers is None
-        ):
-            self.cluster_centers = {}
-            self.cluster_ids = set(self.dataset["__cluster"])
-            self.clusters = len(self.cluster_ids)
-            for i in self.cluster_ids:
-                cluster = self.dataset.filter(lambda x: x["__cluster"] == i)
-                self.cluster_centers[i] = np.mean(
-                    np.array(cluster["__embedding"]), axis=0
-                )
-
-        # if we loaded something that already has embeddings, we can set the embedding matrix
-        if (
-            "__embedding" in self.dataset.column_names
-            and self.emb_matrix is None
-        ):
-            self.emb_matrix = np.array(self.dataset["__embedding"])
-
     def __repr__(self):
         return pd.DataFrame(self.dataset.select(range(10))).__repr__()
 
