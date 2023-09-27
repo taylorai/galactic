@@ -284,22 +284,26 @@ def ai_tagger(
             logger.info(f"Tagging with tag {tag}...")
             # construct prompt template
             if prompt is None:
-                prompt = f"Tag the provided text with the following tag:\n"
+                prompt_template = (
+                    f"Tag the provided text with the following tag:\n"
+                )
                 if isinstance(tags, list):
-                    prompt += f"  - {tag}\n"
+                    prompt_template += f"  - {tag}\n"
                 else:
-                    prompt += f"  - {tag}: {tags[tag]}\n"
-                prompt += "Answer True if the tag applies to the text, and False if it does not. "
+                    prompt_template += f"  - {tag}: {tags[tag]}\n"
+                prompt_template += "Answer True if the tag applies to the text, and False if it does not. "
                 if allow_not_sure:
-                    prompt += "If you're not sure, answer Not sure."
-                prompt += (
+                    prompt_template += "If you're not sure, answer Not sure."
+                prompt_template += (
                     "\n\n---\n\nText: {{"
                     + field
                     + "}}\n\n---\n\nDoes the tag apply?"
                 )
-            template = jinja2.Template(prompt)
+            else:
+                prompt_template = prompt
+            prompt_template = jinja2.Template(prompt_template)
             prompts = self.dataset.select_columns([field]).map(
-                lambda sample: {"__prompt": template.render(**sample)}
+                lambda sample: {"__prompt": prompt_template.render(**sample)}
             )["__prompt"]
             logger.info(f"Example prompt for tag {tag}: {prompts[0]}")
 

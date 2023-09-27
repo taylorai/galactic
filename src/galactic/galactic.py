@@ -95,6 +95,7 @@ class GalacticDataset:
     reduce_embedding_dim = embedding.reduce_embedding_dim
     ## clustering
     cluster = clustering.cluster
+    _get_clusters = clustering._get_clusters
     remove_cluster = clustering.remove_cluster
     ai_label_clusters = clustering.ai_label_clusters
     get_cluster_info = clustering.get_cluster_info
@@ -161,7 +162,7 @@ class GalacticDataset:
     def __getattr__(self, name):
         if name in ["column_names", "features", "info"]:
             return getattr(self.dataset, name)
-        elif name in ["filter", "map", "select", "shuffle"]:
+        elif name in ["filter", "map", "select", "shuffle", "select_columns"]:
             if name == "shuffle":
                 logger.warning(
                     "Shuffling the dataset can be really expensive! Watch out!"
@@ -181,6 +182,20 @@ class GalacticDataset:
                 )
 
             return wrapper
+
+    def drop_column(
+        self,
+        column: str,
+    ):
+        """
+        This method drops a column from the dataset.
+
+        :param column: The column to drop.
+        :type column: str
+        """
+        self.dataset = self.dataset.select_columns(
+            [x for x in self.dataset.column_names if x != column]
+        )
 
     def set_openai_key(self, key):
         """

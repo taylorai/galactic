@@ -1,5 +1,6 @@
 ### Code here adapted from openai cookbook: https://github.com/openai/openai-cookbook/blob/main/examples/api_request_parallel_processor.py
 import aiohttp
+import json
 import numpy as np
 import asyncio
 import logging
@@ -82,7 +83,7 @@ class APIRequest:
         request_header: dict,
         retry_queue: asyncio.Queue,
         status_tracker: StatusTracker,
-        pbar: tqdm,
+        pbar: Optional[tqdm] = None,
     ):
         try:
             status_tracker.total_requests += 1
@@ -95,6 +96,7 @@ class APIRequest:
                 ) as response:
                     response = await response.json()
             if "error" in response:
+                logger.error(str(response))
                 if "Rate limit" in response["error"].get("message", ""):
                     status_tracker.time_of_last_rate_limit_error = time.time()
                     status_tracker.num_rate_limit_errors += 1
@@ -112,7 +114,8 @@ class APIRequest:
                     status_tracker.num_tasks_in_progress -= 1
                     status_tracker.num_tasks_failed += 1
             else:
-                pbar.update(1)
+                if pbar is not None:
+                    pbar.update(1)
                 self.result.append(response)
                 status_tracker.num_tasks_in_progress -= 1
                 status_tracker.num_tasks_succeeded += 1
@@ -135,6 +138,7 @@ async def process_api_requests_from_list(
     max_new_tokens: Optional[int] = None,
     max_tokens_per_minute: int = 90_000,
     max_requests_per_minute: int = 2000,
+    show_progress: bool = True,
 ):
     if type not in ["embedding", "chat"]:
         raise ValueError("type must be either 'embedding' or 'chat'")
@@ -166,7 +170,10 @@ async def process_api_requests_from_list(
     logger.debug(f"Initialization complete.")
 
     # turn the texts into an iterator
-    pbar = tqdm(total=len(texts))
+    if show_progress:
+        pbar = tqdm(total=len(texts))
+    else:
+        pbar = None
     texts = iter(enumerate(texts))
     results = []
     while True:
@@ -192,6 +199,7 @@ async def process_api_requests_from_list(
                     )
                     status_tracker.num_tasks_started += 1
                     status_tracker.num_tasks_in_progress += 1
+                    results.append(next_request)
                     logger.debug(
                         f"Reading request {next_request.task_id}: {next_request}"
                     )
@@ -239,7 +247,6 @@ async def process_api_requests_from_list(
                 logger.debug(
                     f"Called API for request {next_request.task_id}: {next_request}"
                 )
-                results.append(next_request)
                 next_request = None  # reset next_request to empty
 
         # if all tasks are finished, break
@@ -286,6 +293,7 @@ def embed_texts_with_openai(
     max_attempts: int = 10,
     max_tokens_per_minute: int = 350_000,
     max_requests_per_minute: int = 3500,
+    show_progress: bool = True,
 ):
     results = asyncio.run(
         process_api_requests_from_list(
@@ -295,6 +303,7 @@ def embed_texts_with_openai(
             max_attempts=max_attempts,
             max_requests_per_minute=max_requests_per_minute,
             max_tokens_per_minute=max_tokens_per_minute,
+            show_progress=show_progress,
         )
     )
     # extract the embeddings
@@ -307,6 +316,9 @@ def embed_texts_with_openai(
             arr = np.array([r["embedding"] for r in data])
             avg = np.mean(arr, axis=0)
             embs.append((avg / np.linalg.norm(avg)).tolist())
+    if len(embs) != len(texts):
+        # write to json for debugging
+        raise ValueError("Length of results does not match length of texts.")
     return embs
 
 
@@ -319,6 +331,7 @@ def run_chat_queries_with_openai(
     max_attempts: int = 10,
     max_tokens_per_minute: int = 90_000,
     max_requests_per_minute: int = 2000,
+    show_progress: bool = True,
 ):
     results = asyncio.run(
         process_api_requests_from_list(
@@ -331,6 +344,7 @@ def run_chat_queries_with_openai(
             max_new_tokens=max_new_tokens,
             max_requests_per_minute=max_requests_per_minute,
             max_tokens_per_minute=max_tokens_per_minute,
+            show_progress=show_progress,
         )
     )
     # extract the replies

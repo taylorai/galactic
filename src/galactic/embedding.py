@@ -7,7 +7,7 @@ from typing import Union, Literal
 import openai
 import tiktoken
 from .async_openai import embed_texts_with_openai
-
+import time
 import logging
 
 logger = logging.getLogger("galactic")
@@ -164,21 +164,44 @@ def get_embeddings(
 ):
     """Get embeddings for a field in the dataset."""
     self.initialize_embedding_model(backend=backend)
+
+    # make sure the field doesn't exist already
+    if embedding_field in self.dataset.column_names:
+        raise ValueError(
+            f"Field {embedding_field} already exists in dataset. Please choose a different name, or drop the column."
+        )
+
     if backend == "auto":
         backend = "cpu"
     if backend == "openai":
-        embs = embed_texts_with_openai(
-            self.dataset[input_field], self.openai_api_key
-        )
+        requests_left = {"n": len(self.dataset)}
+
+        def _embed_batch(batch):
+            start_time = time.time()
+            embs = embed_texts_with_openai(
+                batch[input_field], self.openai_api_key, show_progress=False
+            )
+            requests_left["n"] -= len(batch[input_field])
+            logger.info(f"Requests left: {requests_left['n']}")
+            end_time = time.time()
+            # if it took less than 1m, cool down to avoid rate limits
+            if end_time - start_time < 60 and requests_left["n"] > 0:
+                time.sleep(60 - (end_time - start_time))
+            return {embedding_field: embs}
+
         self.dataset = self.dataset.map(
-            lambda x, idx: {embedding_field: embs[idx]}, with_indices=True
+            _embed_batch,
+            batched=True,
+            batch_size=self.max_requests_per_minute,
         )
     else:
         self.dataset = self.dataset.map(
             lambda x: {embedding_field: self.model(x[input_field])}
         )
-    self.emb_matrix = np.array(self.dataset["__embedding"])
-    logger.info(f"Created embeddings on field '{input_field}'")
+    self.emb_matrix = np.array(self.dataset[embedding_field])
+    logger.info(
+        f"Created embeddings on field '{input_field}', stored in '{embedding_field}'."
+    )
     return self
 
 

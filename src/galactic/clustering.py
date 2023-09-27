@@ -16,11 +16,13 @@ logger = logging.getLogger("galactic")
 
 def cluster(
     self,
-    n_clusters: int,
+    n_clusters: Optional[int] = None,
     method: Literal[
         "kmeans", "minibatch_kmeans", "bisecting_kmeans", "hdbscan"
     ] = "kmeans",
     embedding_field: str = "__embedding",
+    cluster_field: str = "__cluster",
+    overwrite: bool = False,
     **kwargs,
 ):
     """Cluster the dataset using the specified method."""
@@ -28,11 +30,36 @@ def cluster(
         raise ValueError(
             "You must call get_embeddings() before calling cluster(). If your dataset already has an embeddings column, pass it as 'embedding_field' argument."
         )
+    # check if cluster_field is already set
+    if cluster_field in self.dataset.column_names:
+        if overwrite:
+            logger.warning(
+                f"You already have clusters in field {cluster_field}. Since overwrite=True, these will be overwritten."
+            )
+            self.dataset = self.dataset.select_columns(
+                [c for c in self.dataset.column_names if c != cluster_field]
+            )
+        else:
+            raise ValueError(
+                f"You already have clusters in field {cluster_field}. If you want to overwrite them, pass overwrite=True. Otherwise, use a different 'cluster_field' to create a new clustering."
+            )
+
+    # set cluster ids and centers, in a way that allows multiple clusterings!
+    if self.cluster_ids is None:
+        self.cluster_ids = {}
+    if self.cluster_centers is None:
+        self.cluster_centers = {}
+
     # check if emb dimension is large
     if len(self.dataset[embedding_field][0]) >= 384:
         logger.info(
             "Embedding dimension is large, which is fine! But consider also experimenting with dimensionality reduction before clustering."
         )
+    if method != "hdbscan" and n_clusters is None:
+        raise ValueError(
+            "You must specify the number of clusters with n_clusters argument. If you don't want to set this a priori, try using the hdbscan method, which doesn't require you to set it."
+        )
+
     if method == "minibatch_kmeans":
         model = MiniBatchKMeans(
             n_clusters=n_clusters, batch_size=kwargs.get("batch_size", 1024)
@@ -42,35 +69,35 @@ def cluster(
             self.dataset.map(
                 lambda x: model.partial_fit(np.array(x[embedding_field])),
             )
-        self.cluster_ids = list(range(n_clusters))
-        # cluster centers is a dict of id -> center
-        self.cluster_centers = {
-            i: model.cluster_centers_[i] for i in range(n_clusters)
-        }
-
-    elif method == "kmeans":
-        model = KMeans(n_clusters=n_clusters, init="k-means++", n_init=1)
-        arr = np.array(self.dataset[embedding_field])
-        model.fit(arr)
-        self.cluster_ids = list(range(n_clusters))
-        # cluster centers is a dict of id -> center
-        self.cluster_centers = {
-            i: model.cluster_centers_[i] for i in range(n_clusters)
-        }
-    elif method == "bisecting_kmeans":
-        model = BisectingKMeans(
-            n_clusters=n_clusters,
-            init="k-means++",
-            n_init=1,
-            bisecting_strategy="largest_cluster",
+        self.dataset = self.dataset.map(
+            lambda batch: {
+                cluster_field: model.predict(
+                    batch[embedding_field],
+                )
+            },
+            batched=True,
+            batch_size=kwargs.get("batch_size", 1024),
         )
+
+    elif method in ["kmeans", "bisecting_kmeans"]:
+        if method == "kmeans":
+            model = KMeans(n_clusters=n_clusters, init="k-means++", n_init=1)
+        elif method == "bisecting_kmeans":
+            model = BisectingKMeans(
+                n_clusters=n_clusters,
+                init="k-means++",
+                n_init=1,
+                bisecting_strategy="largest_cluster",
+            )
         arr = np.array(self.dataset[embedding_field])
-        model.fit(arr)
-        self.cluster_ids = list(range(n_clusters))
+        labels = model.fit_predict(arr)
+        self.cluster_ids[cluster_field] = list(set(labels))
         # cluster centers is a dict of id -> center
-        self.cluster_centers = {
+        self.cluster_centers[cluster_field] = {
             i: model.cluster_centers_[i] for i in range(n_clusters)
         }
+        self.dataset = self.dataset.add_column(cluster_field, labels)
+
     elif method == "hdbscan":
         min_cluster_size = kwargs.get("min_cluster_size", 25)
         model = HDBSCAN(
@@ -85,129 +112,212 @@ def cluster(
         )
         arr = np.array(self.dataset[embedding_field])
         labels = model.fit_predict(arr)
-        self.cluster_ids = list(set(labels))
+        self.cluster_ids[cluster_field] = list(set(labels))
         # cluster centers is a dict of id -> center
-        self.cluster_centers = {
+        self.cluster_centers[cluster_field] = {
             i: model.medoids_[i] for i in range(max(self.cluster_ids))
         }
-        self.dataset = self.dataset.add_column("__cluster", labels)
+        self.dataset = self.dataset.add_column(cluster_field, labels)
     else:
         raise ValueError(f"Unknown clustering method: {method}")
 
-    if method != "hdbscan":
-        # add new column with cluster labels
-        self.dataset = self.dataset.map(
-            lambda x: {"__cluster": model.predict(x[embedding_field])},
-            batched=True,
-        )
-
 
 # preferred to filtering out the cluster, because it will remove the cluster from the cluster_ids list
-def remove_cluster(self, cluster: int):
+def remove_cluster(self, cluster_field: str, cluster_id: int):
     """Remove a cluster from the dataset."""
-    self.dataset = self.dataset.filter(lambda x: x["__cluster"] != cluster)
-    self.cluster_ids.remove(cluster)
-    del self.cluster_centers[cluster]
+    if cluster_field not in self.dataset.column_names:
+        raise ValueError(
+            f"Cluster field {cluster_field} not found in dataset."
+        )
+    else:
+        self.dataset = self.dataset.filter(
+            lambda x: x[cluster_field] != cluster_id
+        )
+        self.cluster_ids[cluster_field].remove(cluster_id)
+        del self.cluster_centers[cluster_field][cluster_id]
+    logger.info(
+        f"Removed cluster {cluster_id} from clustering {cluster_field} from dataset."
+    )
+
+
+# this does loop through the whole dataset, but that's faster than looping through it N times for N clusters
+def _get_clusters(self, cluster_field: str):
+    clusters = {}
+    self.dataset.map(
+        lambda x: clusters.setdefault(x[cluster_field], []).append(x),
+    )
+    return {
+        cluster_id: datasets.Dataset.from_list(cluster)
+        for cluster_id, cluster in clusters.items()
+    }
+
+
+def _get_nearest_in_cluster(
+    cluster: datasets.Dataset,
+    embedding_field: str,
+    query: np.ndarray,
+    k: int = 3,
+):
+    """Get the nearest neighbors of a query point in a cluster."""
+    emb_matrix = np.array(cluster[embedding_field])
+    similarities = np.dot(emb_matrix, query)
+    top_k = list(np.argsort(similarities)[::-1][:k])
+    examples = list(cluster.select(top_k))
+    return examples
 
 
 def ai_label_clusters(
     self,
-    fields: list[str],
-    new_column: str = "__cluster_label",
-    n_examples: int = 10,
-    selection: str = "random",  # or nearest
+    new_column: str,
+    context_fields: list[str],
+    cluster_field: str = "__cluster",
     embedding_field: str = "__embedding",
+    n_examples: int = 10,
+    selection: Literal["random", "nearest"] = "random",
     prompt: Optional[str] = None,  # jinja2 template
 ):
     if not prompt:
         # Default Jinja2 template
-        prompt = """
-        Please identify a single shared topic or theme among the following examples in a few words. It's ok if there are a small minority of examples that don't fit with the theme, but if there's no a clear shared topic or theme, just say "No shared topic or theme".
-        
-        {% for example in examples %}
-            ### Example {{ loop.index }}
-            {% for field in fields %}
-                - {{ field }}: {{ example[field] }}
-            {% endfor %}
-        {% endfor %}
-        
-        Now, state the single topic or theme in 3-10 words, no long lists:
-        """.strip()
+        prompt = (
+            "Please identify a single shared topic or theme among the following examples in a few words. "
+            "It's ok if there are a small minority of examples that don't fit with the theme, but if "
+            "there's no clear shared topic or theme, just say 'No shared topic or theme'.\n\n"
+            "{% for example in examples %}\n"
+            "\t### Example {{ loop.index }}\n"
+            "\t{% for field in fields %}\n"
+            "\t\t- {{ field }}: {{ example[field] }}\n"
+            "\t{% endfor %}\n"
+            "{% endfor %}\n\n"
+            "Now, state the single topic or theme in 3-10 words, no long lists:"
+        )
     template = jinja2.Template(prompt)
     queries = []
-    for cluster_id in self.cluster_centers.keys():
-        cluster_center = self.cluster_centers[cluster_id]
-        cluster = self.dataset.filter(
-            lambda x: x["__cluster"] == cluster_id
-        ).select_columns(fields + [embedding_field])
+
+    logger.info("Splitting dataset into clusters... (this might take a bit).")
+    clusters = self._get_clusters(cluster_field)
+    ids = []
+    for id, cluster in clusters.items():
+        ids.append(id)
+        cluster_center = self.cluster_centers[cluster_field][id]
+        cluster = cluster.select_columns(context_fields + [embedding_field])
         if len(cluster) < n_examples:
-            examples = list(cluster.select_columns(fields))
+            examples = list(cluster.select_columns(context_fields))
         elif selection == "nearest":
-            emb_matrix = np.array(cluster[embedding_field])
-            similarities = np.dot(emb_matrix, cluster_center)
-            top_k = list(np.argsort(similarities)[::-1][:n_examples])
-            examples = list(cluster.select(top_k).select_columns(fields))
+            examples = _get_nearest_in_cluster(
+                cluster, embedding_field, cluster_center, k=n_examples
+            ).select_columns(context_fields)
         elif selection == "random":
             examples = random.choices(
-                list(cluster.select_columns(fields)), k=n_examples
+                list(cluster.select_columns(context_fields)), k=n_examples
             )
         else:
             raise ValueError(f"Unknown selection method: {selection}")
 
-        prompt = template.render(examples=examples, fields=fields)
+        prompt = template.render(examples=examples, fields=context_fields)
         queries.append(prompt)
 
     responses = run_chat_queries_with_openai(queries, self.openai_api_key)
+    id2label = {id: response for id, response in zip(ids, responses)}
     self.dataset = self.dataset.map(
-        lambda x: {new_column: responses[x["__cluster"]]},
+        lambda x: {new_column: id2label[x[cluster_field]]}
     )
     return self
 
 
-def get_cluster_info(self, n_neighbors: int = 3, field: str = None):
+def get_cluster_info(
+    self,
+    n_neighbors: int = 3,
+    cluster_field: str = "__cluster",
+    embedding_field: str = "__embedding",
+    context_fields: list[str] = [],
+    truncate_fields: int = 250,
+    verbose: bool = True,
+):
     """
     Goal is to do some kind of unsupervised domain discovery thing here to figure out what the clusters mean.
     """
-    if not hasattr(self, "cluster_centers"):
+    result = []
+    if (
+        not hasattr(self, "cluster_centers")
+        or len(self.cluster_centers.keys()) == 0
+    ):
         raise ValueError(
             "You must call cluster() before calling get_cluster_info()"
         )
     if not hasattr(self, "model"):
         raise ValueError(
-            "You must call get_embeddings() before calling get_cluster_info()"
+            "You must call get_embeddings() before calling get_cluster_info(). If your dataset already has embeddings, you need to re-initialize the embedding model with initialize_embedding_model() so that new embeddings can be computed for queries."
+        )
+    if cluster_field not in self.dataset.column_names:
+        raise ValueError(
+            f"Cluster field {cluster_field} not found in dataset."
         )
 
-    counts = Counter(self.dataset["__cluster"])
+    counts = Counter(self.dataset[cluster_field])
 
     # for each one, get the 3 nearest neighbors
-    for id, emb in self.cluster_centers.items():
-        print(f"Cluster {id} ({counts[id]} items)")
-        nn = self.get_nearest_neighbors(emb, k=n_neighbors)
-        if field is not None:
-            for n in nn:
-                print("\t" + n[field])
-                print("---")
-        else:
-            for n in nn:
-                print({k: v for k, v in n.items() if k != "__embedding"})
+    clusters = self._get_clusters(cluster_field)
+    for id, cluster in clusters.items():
+        cluster_center = self.cluster_centers[cluster_field][id]
+        examples = _get_nearest_in_cluster(
+            cluster, embedding_field, cluster_center, k=n_neighbors
+        )
+
+        cluster_info = {
+            "cluster_id": id,
+            "cluster_size": counts[id],
+            # keep only fields in context_fields
+            "examples": [
+                {field: example[field] for field in context_fields}
+                for example in examples
+            ],
+        }
+        result.append(cluster_info)
+    if verbose:
+        for cluster_info in result:
+            print(
+                f"Cluster {cluster_info['cluster_id']} ({cluster_info['cluster_size']} items)"
+            )
+            if len(context_fields) > 0:
+                for idx, example in enumerate(cluster_info["examples"]):
+                    print(f"### Example {idx + 1}")
+                    for field in context_fields:
+                        print(
+                            f"\t- {field}: {example[field][:truncate_fields]}"
+                        )
+    return result
 
 
 def get_duplicates(
-    cluster: datasets.Dataset, threshold: float, strategy: str = "random"
+    cluster: datasets.Dataset,
+    cluster_center: np.ndarray,
+    threshold: float,
+    emb_matrix: Optional[
+        np.ndarray
+    ] = None,  # pass this in if you already have it
+    similarities: Optional[
+        np.ndarray
+    ] = None,  # pass this in if you already have it
+    embedding_field: str = "__embedding",
+    dedup_strategy: Literal["random", "nearest", "furthest"] = "random",
 ):
     """Get duplicates in a cluster."""
     duplicates = []
     num_points = len(cluster)
-    emb_matrix = np.array(cluster["__embedding"])
-    if strategy != "random":
-        centroid = np.mean(emb_matrix, axis=0)
+    if emb_matrix is None:
+        emb_matrix = np.array(cluster[embedding_field])
+    if dedup_strategy != "random":
+        # centroid = np.mean(emb_matrix, axis=0)
+        # no longer doing this because for e.g. hdbscan we might use the medoid instead.
+        # center should be passed as an argument
         id2dist = {
-            cluster[i]["__id"]: np.dot(emb_matrix[i], centroid)
+            cluster[i]["__id"]: np.dot(emb_matrix[i], cluster_center)
             for i in range(num_points)
         }
 
     # find connected components
-    similarities = np.dot(emb_matrix, emb_matrix.T)
+    if similarities is None:
+        similarities = np.dot(emb_matrix, emb_matrix.T)
     G = nx.Graph()
     for i in range(num_points):
         for j in range(i + 1, num_points):
@@ -219,39 +329,46 @@ def get_duplicates(
     # get duplicates
     for cmp in nx.connected_components(G):
         cmp = list(cmp)
-        if strategy == "random":
-            duplicates.extend(cmp[1:])
-        elif strategy == "nearest":
+        if dedup_strategy == "nearest":
             cmp.sort(key=lambda x: id2dist[x])
-            duplicates.extend(cmp[1:])
-        elif strategy == "furthest":
+        elif dedup_strategy == "furthest":
             cmp.sort(key=lambda x: -id2dist[x])
-            duplicates.extend(cmp[1:])
-        else:
-            raise ValueError(f"Unknown strategy: {strategy}")
+        duplicates.extend(cmp[1:])
     return duplicates
 
 
 def tune_threshold(
     cluster: datasets.Dataset,
+    cluster_center: np.ndarray,
     target_retention: float,
     tol: float = 0.01,
     max_iter: int = 30,
+    embedding_field: str = "__embedding",
+    dedup_strategy: Literal["random", "nearest", "furthest"] = "random",
 ):
     """Tune the threshold for a cluster."""
     tol = max(tol, 1 / len(cluster))
-    emb_matrix = np.array(cluster["__embedding"])
+    emb_matrix = np.array(cluster[embedding_field])
     similarities = np.dot(emb_matrix, emb_matrix.T)
     min_sim = np.min(similarities)
     max_sim = np.max(similarities)
 
     # use binary search to find threshold
+    print("Minimum similarity:", min_sim, "Maximum similarity:", max_sim)
     lo = min_sim
     hi = max_sim
 
     for _ in range(max_iter):
         mid = (lo + hi) / 2
-        duplicates = get_duplicates(cluster, mid)
+        duplicates = get_duplicates(
+            cluster=cluster,
+            cluster_center=cluster_center,
+            threshold=mid,
+            emb_matrix=emb_matrix,
+            similarities=similarities,
+            embedding_field=embedding_field,
+            dedup_strategy=dedup_strategy,
+        )
         # Calculate the retention rate after removing duplicates
         retention = 1 - len(duplicates) / len(cluster)
         print(f"Threshold: {round(mid, 3)}, Retention: {round(retention, 3)}")
@@ -275,30 +392,43 @@ def semdedup(
     self,
     target_retention: Optional[float] = 0.8,
     threshold: Optional[float] = None,
+    embedding_field: str = "__embedding",
+    cluster_field: str = "__cluster",
+    num_tuning_clusters: int = 3,
+    dedup_strategy: Literal["random", "nearest", "furthest"] = "random",
     inplace=True,
 ):
     """Remove semantic near-duplicates from the dataset."""
+    print("It's semdedup time! Using embedding field", embedding_field)
     if target_retention is None and threshold is None:
         raise ValueError(
             "You must specify either target_retention or threshold."
         )
     if target_retention is not None and threshold is not None:
         logger.warning(
-            "Both target_retention and threshold specified. Using target_retention to tune threshold."
+            f"Both target_retention and threshold specified. Using target_retention to tune threshold on {num_tuning_clusters} clusters."
         )
 
+    # first get all the clusters so we only have to do this once. but don't semdedup noise (-1)
+    clusters = self._get_clusters(cluster_field)
+    if -1 in clusters:
+        del clusters[-1]
+
     if target_retention is not None:
-        cluster_ids = list(set(self.dataset["__cluster"]))
-        tuning_clusters = random.choices(cluster_ids, k=3)
+        tuning_clusters = random.choices(
+            list(clusters.keys()), k=num_tuning_clusters
+        )
         # tune threshold
-        logger.info("Tuning threshold on 3 clusters...")
+        logger.info(f"Tuning threshold on {num_tuning_clusters} clusters...")
         thresholds = []
         for tuning_cluster in tuning_clusters:
+            cluster = clusters[tuning_cluster]
             threshold = tune_threshold(
-                self.dataset.filter(
-                    lambda x: x["__cluster"] == tuning_cluster
-                ),
+                cluster,
+                self.cluster_centers[cluster_field][tuning_cluster],
                 target_retention,
+                embedding_field=embedding_field,
+                dedup_strategy=dedup_strategy,
             )
             thresholds.append(threshold)
         threshold = np.mean(thresholds)
@@ -306,11 +436,18 @@ def semdedup(
 
     # get duplicates
     remove = []
-    for cluster_id in self.cluster_ids:
-        cluster = self.dataset.filter(lambda x: x["__cluster"] == cluster_id)
-        if len(cluster) < 2:
+    for cluster_id, cluster in clusters.items():
+        if (
+            len(cluster) < 2 or cluster_id < 0
+        ):  # don't deduplicate noise or singletons
             continue
-        duplicates = get_duplicates(cluster, threshold)
+        duplicates = get_duplicates(
+            cluster,
+            self.cluster_centers[cluster_field][cluster_id],
+            threshold=threshold,
+            embedding_field=embedding_field,
+            dedup_strategy=dedup_strategy,
+        )
         logger.info(
             f"Cluster {cluster_id} has {len(duplicates)} duplicates ({round(len(duplicates) / len(cluster) * 100, 1)}%).\n"
         )
