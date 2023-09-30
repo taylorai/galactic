@@ -7,7 +7,7 @@ import numpy as np
 import joblib
 import tiktoken
 import jinja2
-from typing import Optional, Union
+from typing import Optional, Union, Literal
 from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import SGDClassifier
 from sklearn.model_selection import train_test_split
@@ -189,7 +189,7 @@ def ai_classifier(
     field: Optional[str],
     classes: Union[list[str], dict[str, str]],
     prompt: Optional[str] = None,
-    backend="openai",
+    backend: Literal["openai", "huggingface", "embeddings"] = "openai",
 ):
     """
     Classify a field using OpenAI's API or a HF zero-shot classifier to generate a new column based on an existing column.

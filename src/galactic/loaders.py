@@ -4,9 +4,7 @@ import datasets
 import json
 import pybloom_live
 import pandas as pd
-from .utils import (
-    read_csv,
-)
+from .utils import read_csv, read_jsonl
 from tqdm.auto import tqdm
 import pyarrow.parquet as pq
 
@@ -47,7 +45,7 @@ def from_jsonl(cls, path):
     :return: An instance of the class populated with the dataset from the JSONL file.
     :rtype: cls
     """
-    df = pd.read_json(path, lines=True, orient="records")
+    df = read_jsonl(path)
     return cls.from_pandas(df)
 
 
@@ -69,7 +67,7 @@ def from_parquet(cls, path):
     return cls.from_pandas(df)
 
 
-def from_pandas(cls, df, **kwargs):
+def from_pandas(cls, df):
     """
     Loads a dataset from a Pandas DataFrame.
 
@@ -80,11 +78,10 @@ def from_pandas(cls, df, **kwargs):
 
     :param df: The Pandas DataFrame containing the dataset.
     :type df: pd.DataFrame
-    :param kwargs: Additional keyword arguments passed to datasets.Dataset.from_pandas().
     :return: An instance of the class populated with the dataset from the DataFrame.
     :rtype: cls
     """
-    dataset = datasets.Dataset.from_pandas(df, **kwargs)
+    dataset = datasets.Dataset.from_pandas(df)
     return cls(dataset)
 
 

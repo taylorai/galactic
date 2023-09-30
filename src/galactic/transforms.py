@@ -117,7 +117,7 @@ def ai_column(
     new_column: str,
     prompt: str,
     depends_on=list[str],
-    normalize: list[str] = ["strip", "lower"],  # must be methods of str class
+    normalize: list[str] = ["strip"],  # must be methods of str class
     system_prompt: Optional[str] = None,
 ):
     """
@@ -170,6 +170,7 @@ def ai_column(
         max_requests_per_minute=self.max_requests_per_minute,
     )
     # apply normalizations
+    responses = [r if r is not None else "" for r in responses]
     for fn in normalize:
         try:
             responses = [getattr(str, fn)(response) for response in responses]

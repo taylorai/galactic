@@ -120,7 +120,8 @@ class APIRequest:
                 status_tracker.num_tasks_in_progress -= 1
                 status_tracker.num_tasks_succeeded += 1
         except Exception as e:
-            self.result.append(str(e))
+            logger.error(f"Exception: {e}")
+            self.result.append({"error": str(e)})
             if self.attempts_left:
                 retry_queue.put_nowait(self)
             else:
@@ -290,7 +291,7 @@ async def process_api_requests_from_list(
 def embed_texts_with_openai(
     texts: list[str],
     api_key: str,
-    max_attempts: int = 10,
+    max_attempts: int = 3,
     max_tokens_per_minute: int = 350_000,
     max_requests_per_minute: int = 3500,
     show_progress: bool = True,
@@ -328,7 +329,7 @@ def run_chat_queries_with_openai(
     system_prompt: Optional[str] = None,
     logit_bias: Optional[dict[str, float]] = None,
     max_new_tokens: Optional[int] = None,
-    max_attempts: int = 10,
+    max_attempts: int = 3,
     max_tokens_per_minute: int = 90_000,
     max_requests_per_minute: int = 2000,
     show_progress: bool = True,
@@ -350,6 +351,10 @@ def run_chat_queries_with_openai(
     # extract the replies
     replies = [None for _ in range(len(queries))]
     for result in results:
+        if isinstance(result.result[-1], str):
+            logger.error(
+                f"Result is a string instead of the expected dict: {result}"
+            )
         if "error" in result.result[-1].keys():
             replies[result.task_id] = None
         else:

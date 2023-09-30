@@ -27,3 +27,13 @@ joblib
 nest_asyncio
 umap-learn
 datasketch
+matplotlib
+seaborn
+justext
+lxml
+trafilatura
+selenium
+webdriver-manager
+readabilipy
+"goose3[all]"
+

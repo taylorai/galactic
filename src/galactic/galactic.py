@@ -6,6 +6,7 @@ from typing import Optional, Sequence
 from dataclasses import dataclass
 from . import (
     classifiers,
+    conversations,
     loaders,
     filters,
     taggers,
@@ -14,7 +15,9 @@ from . import (
     clustering,
     minhash_lsh,
     visualize,
+    scraping,
 )
+from .base import GalacticDatasetBase
 
 # set up logging
 from .logger import setup_logger
@@ -24,7 +27,7 @@ logger = logging.getLogger("galactic")
 
 
 @dataclass
-class GalacticDataset:
+class GalacticDataset(GalacticDatasetBase):
     """
     This is the GalacticDataset class. It contains methods for loading data,
     filtering data, tagging data, transforming data, and classifying data.
@@ -48,9 +51,25 @@ class GalacticDataset:
     from_hugging_face = classmethod(loaders.from_hugging_face)
     from_hugging_face_stream = classmethod(loaders.from_hugging_face_stream)
     save = loaders.save
+    ## conversation utils
+    conversation_from_dicts = conversations.conversation_from_dicts
+    conversation_from_string = conversations.conversation_from_string
+    convert_conversation_to_string = (
+        conversations.convert_conversation_to_string
+    )
+    standardize_last_turn = conversations.standardize_last_turn
+    get_conversation_length = conversations.get_conversation_length
+    get_conversation_speakers = conversations.get_conversation_speakers
+    is_alternating = conversations.is_alternating
+    get_last_speaker = conversations.get_last_speaker
+    get_shared_prefix = conversations.get_shared_prefix
+    add_initial_system_message = conversations.add_initial_system_message
+    take_initial_system_message = conversations.take_initial_system_message
+    take_last_message = conversations.take_last_message
     ## filters
     filter_string = filters.filter_string
     filter_regex = filters.filter_regex
+    apply_bloom_filter = filters.apply_bloom_filter
     ## taggers
     tag_string = taggers.tag_string
     tag_regex = taggers.tag_regex
@@ -76,6 +95,7 @@ class GalacticDataset:
     reduce_embedding_dim = embedding.reduce_embedding_dim
     ## clustering
     cluster = clustering.cluster
+    recompute_cluster_centers = clustering.recompute_cluster_centers
     _get_clusters = clustering._get_clusters
     remove_cluster = clustering.remove_cluster
     ai_label_clusters = clustering.ai_label_clusters
@@ -85,6 +105,10 @@ class GalacticDataset:
 
     ## visualizations
     plot_embeddings = visualize.plot_embeddings
+
+    ## scraping
+    scrape_urls = scraping.scrape_urls
+    postprocess_scraped_pages = scraping.postprocess_scraped_pages
 
     def __post_init__(self):
         """

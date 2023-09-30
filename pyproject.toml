@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 
 [project]
 name = "galactic-ai"
-version="0.2.6"
+version="0.2.7"
 authors = [
     {name = "Benjamin Anderson", email = "ben@trytaylor.ai"},
 ]
@@ -40,7 +40,14 @@ dependencies = [
     "nest_asyncio",
     "umap-learn",
     "matplotlib",
-    "seaborn"
+    "seaborn",
+    "trafilatura",
+    "requests",
+    "readabilipy",
+    "boilerpy3",
+    "goose3",
+    "selenium",
+    "webdriver-manager"
 ]
 
 [tool.black]

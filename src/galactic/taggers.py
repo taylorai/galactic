@@ -1,7 +1,7 @@
 import os
 import re
 import pathlib
-from typing import Sequence, Optional, Union
+from typing import Sequence, Optional, Union, Literal
 import numpy as np
 import huggingface_hub
 from transformers import AutoTokenizer
@@ -74,31 +74,44 @@ def tag_regex(self, fields: Sequence[str], regex: str, tag: str):
     return self
 
 
-def detect_language(self, field: str):
+def detect_language(
+    self, field: str, method: Literal["fasttext", "langdetect"] = "fasttext"
+):
     """Detect the language of the specified field."""
     # make sure field exists
     if field not in self.dataset.features:
         raise ValueError(f"Field {field} not found in dataset.")
-    import fasttext
 
-    model_path = huggingface_hub.hf_hub_download(
-        repo_id="TaylorAI/galactic-models", filename="lid.176.ftz"
-    )
-    model = fasttext.load_model(model_path)
+    if method == "fasttext":
+        import fasttext
 
-    def detect_(sample):
-        if isinstance(sample[field], str):
-            return {
-                "__language": model.predict(sample[field].replace("\n", " "))[
-                    0
-                ][0].split("__label__")[1]
-            }
-        else:
-            return {
-                "__language": model.predict(str(sample[field]))[0][0].split(
-                    "__label__"
-                )[1]
-            }
+        model_path = huggingface_hub.hf_hub_download(
+            repo_id="TaylorAI/galactic-models", filename="lid.176.ftz"
+        )
+        model = fasttext.load_model(model_path)
+
+        def detect_(sample):
+            if isinstance(sample[field], str):
+                return {
+                    "__language": model.predict(
+                        sample[field].replace("\n", " ")
+                    )[0][0].split("__label__")[1]
+                }
+            else:
+                return {
+                    "__language": model.predict(str(sample[field]))[0][
+                        0
+                    ].split("__label__")[1]
+                }
+
+    elif method == "langdetect":
+        import langdetect
+
+        def detect_(sample):
+            if isinstance(sample[field], str):
+                return {"__language": langdetect.detect(sample[field])}
+            else:
+                return {"__language": langdetect.detect(str(sample[field]))}
 
     self.dataset = self.dataset.map(detect_)
     logger.info(

@@ -158,7 +158,9 @@ def embed_with_openai(text: str, key: str):
     return avg / np.linalg.norm(avg)
 
 
-def initialize_embedding_model(self, backend: str = "auto"):
+def initialize_embedding_model(
+    self, backend: Literal["auto", "cpu", "gpu", "openai"] = "auto"
+):
     """
     Initializes the embedding model based on the backend.
 
@@ -218,7 +220,7 @@ def get_embeddings(
     self,
     input_field: str,
     embedding_field: str = "__embedding",
-    backend: str = "auto",
+    backend: Literal["auto", "cpu", "gpu", "openai"] = "auto",
 ):
     """
     Get embeddings for a field in the dataset.
@@ -277,7 +279,10 @@ def get_nearest_neighbors(
     k: int = 5,
     embedding_field: str = "__embedding",
 ):
-    """Get the nearest neighbors to a query."""
+    """
+    Get the nearest neighbors to a query.
+
+    """
     if embedding_field not in self.dataset.column_names:
         raise ValueError(
             "You must call get_embeddings() before calling get_nearest_neighbors(). If your dataset already has an embeddings column and it's not '__embeddings', pass it as the 'embedding_field' argument."
