@@ -35,5 +35,5 @@ trafilatura
 selenium
 webdriver-manager
 readabilipy
-"goose3[all]"
+goose3[all]
 
