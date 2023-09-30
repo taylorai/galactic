@@ -9,9 +9,11 @@ GalacticDataset
 
    classifiers
    clustering
+   conversations
    embedding
    filters
    loaders
    minhash
    taggers
    transforms
+   visualize
