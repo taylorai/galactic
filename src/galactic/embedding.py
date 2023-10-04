@@ -197,7 +197,7 @@ def initialize_embedding_model(
                 f"Dataset does not contain __embedding field. Initializing to use {backend} backend for queries."
             )
 
-    if backend == "cpu":
+    if backend in ["cpu", "onnx"]:
         model_path = hf_hub_download(
             "TaylorAI/galactic-models", filename="model_quantized.onnx"
         )
@@ -309,7 +309,6 @@ def get_embeddings(
         self.dataset = self.dataset.map(
             lambda x: {embedding_field: self.model(x[input_field])}
         )
-    self.emb_matrix = np.array(self.dataset[embedding_field])
     logger.info(
         f"Created embeddings on field '{input_field}', stored in '{embedding_field}'."
     )
@@ -330,13 +329,13 @@ def get_nearest_neighbors(
         raise ValueError(
             "You must call get_embeddings() before calling get_nearest_neighbors(). If your dataset already has an embeddings column and it's not '__embeddings', pass it as the 'embedding_field' argument."
         )
-    if not hasattr(self, "emb_matrix"):
-        self.emb_matrix = np.array(self.dataset["__embedding"])
+
+    emb_matrix = np.array(self.dataset[embedding_field])
     if not hasattr(self, "model"):
         self.initialize_embedding_model()
     if isinstance(query, str):
         query = self.model(query)
-    scores = np.dot(self.emb_matrix, query)
+    scores = np.dot(emb_matrix, query)
     top_k = list(np.argsort(scores)[::-1][:k])
     top_k_items = self.dataset.select(top_k)
     return top_k_items.to_list()

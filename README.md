@@ -35,13 +35,6 @@ To get started, install the package (`pip install galactic-ai`) and import it:
 from galactic import GalacticDataset
 ```
 
-If you have a Mac with Apple Silicon, and want to use it as the backend for local embeddings (instead of CPU), you can *uninstall* ONNX runtime, and replace it with `onnxruntime-silicon`, which is intended to be a drop-in replacement (presumably, faster).
-
-```
-pip uninstall onnxruntime
-pip install onnxruntime-silicon
-```
-
 Galactic supports familiar generic methods for data processing that you'll be familiar with if you've ever used HuggingFace datasets, like `map`, `filter`, `select`. Galactic also provides a higher-level API for common workflows in text data curation, such as computing embeddings, language detection, scrubbing PII, labeling columns with AI, and large-scale deduplication. Let's dive in!
 
 ## NEW in v0.2.6 -- Reduce dimensions & look at your embeddings
