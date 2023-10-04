@@ -7,6 +7,7 @@ from typing import Union, Literal
 import openai
 import tiktoken
 from .async_openai import embed_texts_with_openai
+from .async_replicate import embed_texts_with_replicate
 import time
 import logging
 
@@ -41,7 +42,12 @@ class EmbeddingModel:
         if model_type == "onnx":
             import onnxruntime as ort
 
-            self.session = ort.InferenceSession(self.model_path)
+            providers = ["CPUExecutionProvider"]
+            if "CoreMLExecutionProvider" in ort.get_available_providers():
+                providers.append("CoreMLExecutionProvider")
+            self.session = ort.InferenceSession(
+                self.model_path, providers=providers
+            )  # load the model
         elif model_type == "ctranslate2":
             import ctranslate2
 
@@ -212,6 +218,17 @@ def initialize_embedding_model(
                 "You must set openai_api_key before calling get_embeddings() with openai backend."
             )
         self.model = lambda x: embed_with_openai(x, self.openai_api_key)
+    elif backend == "replicate":
+        self.model = lambda x: embed_texts_with_replicate(
+            texts=[x],
+            api_key=self.replicate_api_key,
+            batch_size=1,
+        )[0]
+    elif backend == "modal":
+        import modal
+
+        self.modal_fn = modal.Function.lookup("gte_small", "GTE.forward")
+        self.model = lambda x: self.modal_fn.remote(x)[0]
     else:
         raise ValueError(f"Unknown backend: {backend}")
 
@@ -262,7 +279,33 @@ def get_embeddings(
             batched=True,
             batch_size=self.max_requests_per_minute,
         )
-    else:
+    elif backend == "replicate":
+        if not hasattr(self, "replicate_api_key"):
+            raise ValueError(
+                "You must set replicate_api_key before calling get_embeddings() with replicate backend."
+            )
+        texts = self.dataset[input_field]
+        embs = embed_texts_with_replicate(
+            texts=texts,
+            api_key=self.replicate_api_key,
+            batch_size=100,
+        )
+        self.dataset = self.dataset.add_column(embedding_field, embs)
+    elif backend == "modal":
+
+        def _embed_batch(batch):
+            texts = batch[input_field]
+            promises = self.modal_fn.map(
+                [texts[i : i + 10] for i in range(0, len(texts), 10)]
+            )
+            results = [p for p in promises]
+            flattened = [item for sublist in results for item in sublist]
+            return {embedding_field: flattened}
+
+        self.dataset = self.dataset.map(
+            _embed_batch, batched=True, batch_size=2000
+        )
+    elif backend == "cpu":
         self.dataset = self.dataset.map(
             lambda x: {embedding_field: self.model(x[input_field])}
         )

@@ -108,7 +108,7 @@ def cluster(
         self.cluster_ids[cluster_field] = list(set(labels))
         # cluster centers is a dict of id -> center
         self.cluster_centers[cluster_field] = {
-            i: model.cluster_centers_[i] for i in range(n_clusters)
+            i: model.cluster_centers_[i] for i in range(max(self.cluster_ids))
         }
         self.dataset = self.dataset.add_column(cluster_field, labels)
 
@@ -548,6 +548,67 @@ def semdedup(
         n_removed = len(remove)
         logger.info(
             f"Removed {len(remove)} / {before_dedup} items flagged as semantic near-duplicates ({round(n_removed / before_dedup * 100, 2)}%)."
+        )
+        return type(self)(
+            new_dataset,
+            model=self.model,
+            emb_matrix=self.emb_matrix,
+            cluster_ids=self.cluster_ids,
+            cluster_centers=self.cluster_centers,
+            openai_api_key=self.openai_api_key,
+        )
+
+
+def remove_prototypes(
+    self,
+    target_retention: float = 0.75,
+    cluster_field: str = "__cluster",
+    embedding_field: str = "__embedding",
+    inplace: bool = True,
+):
+    """
+    Apply the 'SSL prototypes' strategy from D4 (https://arxiv.org/pdf/2308.12284.pdf), which
+    removes the most prototypical examples from each cluster (i.e. those closest to the center)
+    until the target retention rate is reached.
+    """
+    # first get all the clusters so we only have to do this once. but don't semdedup noise (-1)
+    clusters = self._get_clusters(cluster_field)
+    if -1 in clusters:
+        del clusters[-1]
+
+    # then keep a running list of what to remove
+    remove = []
+    for cluster_id, cluster in clusters.items():
+        emb_matrix = np.array(cluster[embedding_field])
+        cluster_center = self.cluster_centers[cluster_field][cluster_id]
+        if (
+            len(cluster) < 2 or cluster_id < 0
+        ):  # don't deduplicate noise or singletons
+            continue
+        # sort by distance to center
+        dists = np.dot(emb_matrix, cluster_center)
+        sorted_indices = np.argsort(dists)
+        # remove the top N prototypical examples
+        n_to_remove = int(len(cluster) * (1 - target_retention))
+        remove.extend(cluster[sorted_indices[:n_to_remove]]["__id"])
+        logger.info(
+            f"Cluster {cluster_id} has {len(remove)} prototypical examples ({round(len(remove) / len(cluster) * 100, 1)}%).\n"
+        )
+
+    if inplace:
+        before_dedup = len(self.dataset)
+        self.dataset = self.dataset.filter(lambda x: x["__id"] not in remove)
+        n_removed = len(remove)
+        logger.info(
+            f"Removed {len(remove)} / {before_dedup} prototypical items ({round(n_removed / before_dedup * 100, 2)}%)."
+        )
+        return self
+    else:
+        before_dedup = len(self.dataset)
+        new_dataset = self.dataset.filter(lambda x: x["__id"] not in remove)
+        n_removed = len(remove)
+        logger.info(
+            f"Removed {len(remove)} / {before_dedup} prototypical items ({round(n_removed / before_dedup * 100, 2)}%)."
         )
         return type(self)(
             new_dataset,
