@@ -13,9 +13,9 @@ from . import (
     transforms,
     embedding,
     clustering,
-    minhash_lsh,
+    # minhash_lsh,
     visualize,
-    scraping,
+    # scraping,
 )
 from .base import GalacticDatasetBase
 
@@ -107,8 +107,8 @@ class GalacticDataset(GalacticDatasetBase):
     plot_embeddings = visualize.plot_embeddings
 
     ## scraping
-    scrape_urls = scraping.scrape_urls
-    postprocess_scraped_pages = scraping.postprocess_scraped_pages
+    # scrape_urls = scraping.scrape_urls
+    # postprocess_scraped_pages = scraping.postprocess_scraped_pages
 
     def __post_init__(self):
         """

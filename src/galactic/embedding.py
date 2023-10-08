@@ -7,170 +7,29 @@ from typing import Union, Literal
 import openai
 import tiktoken
 from .async_openai import embed_texts_with_openai
-from .async_replicate import embed_texts_with_replicate
+from .embedding_backends.replicate import ReplicateEmbeddingModel
+from .embedding_backends.onnx import ONNXEmbeddingModel
+from .embedding_backends.ctranslate2 import CT2EmbeddingModel
+from .embedding_backends.openai import OpenAIEmbeddingModel
 import time
 import logging
 
 logger = logging.getLogger("galactic")
 
 
-class EmbeddingModel:
-    """
-    This class provides methods to load embedding models and generate embeddings.
-
-    :param model_path: Path to the model.
-    :type model_path: str
-    :param tokenizer_path: Path to the tokenizer.
-    :type tokenizer_path: str
-    :param model_type: Type of model to be loaded can be 'onnx' or 'ctranslate2'.
-    :type model_type: str
-    :param max_length: Maximum length of tokenization.
-    :type max_length: int, optional, default=512
-
-    Example:
-
-    .. code-block:: python
-
-        model = EmbeddingModel(model_path='path_to_model', tokenizer_path='path_to_tokenizer', model_type='onnx', max_length=512)
-    """
-
-    def __init__(self, model_path, tokenizer_path, model_type, max_length=512):
-        self.model_path = model_path
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
-        self.max_length = max_length
-        self.model_type = model_type
-        if model_type == "onnx":
-            import onnxruntime as ort
-
-            providers = ["CPUExecutionProvider"]
-            if "CoreMLExecutionProvider" in ort.get_available_providers():
-                providers.append("CoreMLExecutionProvider")
-            self.session = ort.InferenceSession(
-                self.model_path, providers=providers
-            )  # load the model
-        elif model_type == "ctranslate2":
-            import ctranslate2
-
-            self.session = ctranslate2.Encoder(
-                self.model_path, compute_type="int8"
-            )
-
-    def split_and_tokenize(self, text):
-        """
-        Tokenize the text and pad it to be a multiple of max_length.
-
-        :param text: The input text to be tokenized.
-        :type text: str
-        :return: Returns a dictionary containing tokenized and padded 'input_ids', 'attention_mask' and 'token_type_ids'.
-        :rtype: Dict[str, numpy.ndarray]
-
-        Example:
-
-        .. code-block:: python
-
-            tokenized_text = model.split_and_tokenize('sample text')
-        """
-        # first make into tokens
-        tokenized = self.tokenizer(text, return_tensors="np")
-
-        # pad to be a multiple of max_length
-        rounded_len = int(
-            np.ceil(len(tokenized["input_ids"][0]) / self.max_length)
-            * self.max_length
-        )
-        for k in tokenized:
-            tokenized[k] = np.pad(
-                tokenized[k],
-                ((0, 0), (0, rounded_len - len(tokenized[k][0]))),
-                constant_values=0,
-            )
-
-        # reshape into batch with max length
-        for k in tokenized:
-            tokenized[k] = tokenized[k].reshape((-1, self.max_length))
-
-        return tokenized
-
-    def forward_onnx(self, input):
-        outs = []
-        for seq in range(len(input["input_ids"])):
-            out = self.session.run(
-                None,
-                {
-                    "input_ids": input["input_ids"][seq : seq + 1],
-                    "attention_mask": input["attention_mask"][seq : seq + 1],
-                    "token_type_ids": input["token_type_ids"][seq : seq + 1],
-                },
-            )[0]
-            outs.append(out)
-        out = np.concatenate(outs, axis=0)  # bsz, seq_len, hidden_size
-        return out
-
-    def forward_ctranslate2(self, input):
-        input_ids = input["input_ids"].tolist()
-        out = self.session.forward_batch(input_ids).pooler_output
-        return out
-
-    def predict(self, input):
-        input = self.split_and_tokenize(input)
-        if self.model_type == "onnx":
-            # print("onnx")
-            out = self.forward_onnx(input)
-            # print("shape", out.shape)
-            out = np.mean(out, axis=(0, 1))  # mean of seq and bsz
-        elif self.model_type == "ctranslate2":
-            # print("ct2")
-            out = self.forward_ctranslate2(input)
-            out = np.mean(out, axis=0)  # mean just over bsz
-        # normalize to unit vector
-        return out / np.linalg.norm(out)
-
-    def __call__(self, input):
-        return self.predict(input)
-
-
-def embed_with_openai(text: str, key: str):
-    """
-    Embeds a single text with OpenAI API.
-
-    :param text: The input text to be embedded.
-    :type text: str
-    :param key: The API key for OpenAI.
-    :type key: str
-    :return: The normalized averaged embeddings.
-    :rtype: numpy.ndarray
-
-    Example:
-
-    .. code-block:: python
-
-        embedding = embed_with_openai('sample text', 'api_key')
-    """
-    encoding = tiktoken.get_encoding("cl100k_base")
-    tokens = encoding.encode(text)
-    # if longer than 8191, split into chunks
-    if len(tokens) > 8191:
-        num_chunks = int(np.ceil(len(tokens) / 8191))
-        chunks = np.array_split(tokens, num_chunks).tolist()
-    else:
-        chunks = [tokens]
-    openai.api_key = key
-    res = openai.Embedding.create(
-        model="text-embedding-ada-002",
-        input=chunks,
-    )
-    embs = np.array([res.data[i].embedding for i in range(len(res.data))])
-    avg = np.mean(embs, axis=0)
-    return avg / np.linalg.norm(avg)
-
-
 def initialize_embedding_model(
-    self, backend: Literal["auto", "cpu", "gpu", "openai"] = "auto"
+    self,
+    backend: Literal[
+        "cpu", "onnx", "gpu", "openai", "replicate", "modal"
+    ] = "cpu",
+    model: Literal["gte-small", "gte-tiny", None] = "gte-tiny",
+    max_requests_per_minute: Optional[int] = None,
+    max_tokens_per_minute: Optional[int] = None,
 ):
     """
     Initializes the embedding model based on the backend.
 
-    :param backend: The backend used for embedding. Options: 'auto', 'cpu', 'gpu', 'openai'.
+    :param backend: The backend used for embedding. Options: 'cpu', 'gpu', 'openai'.
     :type backend: str, default='auto'
     :raises ValueError: Raises an exception if the backend is 'openai' but openai_api_key is not set, or if the backend is unknown.
 
@@ -180,55 +39,33 @@ def initialize_embedding_model(
 
         initialize_embedding_model('cpu')
     """
-    # if auto, then select intelligently
-    if backend == "auto":
-        if "__embedding" in self.dataset.column_names:
-            embedding_dim = len(self.dataset["__embedding"][0])
-            if embedding_dim == 384:
-                backend = "cpu"
-            elif embedding_dim == 1536:
-                backend = "openai"
-            logger.info(
-                f"Dataset already contains __embedding field. Initializing to use {backend} backend for queries."
-            )
-        else:
-            backend = "cpu"
-            logger.info(
-                f"Dataset does not contain __embedding field. Initializing to use {backend} backend for queries."
-            )
-
     if backend in ["cpu", "onnx"]:
-        model_path = hf_hub_download(
-            "TaylorAI/galactic-models", filename="model_quantized.onnx"
-        )
-        tokenizer_path = "Supabase/gte-small"
-        max_length = 512
-        model = EmbeddingModel(
-            model_path=model_path,
-            tokenizer_path=tokenizer_path,
-            model_type="onnx",
-            max_length=max_length,
-        )
-        self.model = model
+        self.model = ONNXEmbeddingModel(model_name=model)
     elif backend == "gpu":
-        raise NotImplementedError("GPU backend not yet implemented.")
+        self.model = CT2EmbeddingModel(model_name=model)
+
     elif backend == "openai":
         if self.openai_api_key is None:
             raise ValueError(
                 "You must set openai_api_key before calling get_embeddings() with openai backend."
             )
-        self.model = lambda x: embed_with_openai(x, self.openai_api_key)
+        max_rpm = max_requests_per_minute or self.max_requests_per_minute
+        max_tpm = max_tokens_per_minute or self.max_tokens_per_minute
+        self.model = OpenAIEmbeddingModel(
+            openai_api_key=self.openai_api_key,
+            max_requests_per_minute=max_rpm,
+            max_tokens_per_minute=max_tpm,
+        )
     elif backend == "replicate":
-        self.model = lambda x: embed_texts_with_replicate(
-            texts=[x],
-            api_key=self.replicate_api_key,
-            batch_size=1,
-        )[0]
+        self.model = ReplicateEmbeddingModel(
+            replicate_api_key=self.replicate_api_key
+        )
     elif backend == "modal":
-        import modal
+        # import modal
 
-        self.modal_fn = modal.Function.lookup("gte_small", "GTE.forward")
-        self.model = lambda x: self.modal_fn.remote(x)[0]
+        # self.modal_fn = modal.Function.lookup("gte_small", "GTE.forward")
+        # self.model = lambda x: self.modal_fn.remote(x)[0]
+        raise NotImplementedError("not quite yet, bucko")
     else:
         raise ValueError(f"Unknown backend: {backend}")
 
@@ -237,10 +74,19 @@ def get_embeddings(
     self,
     input_field: str,
     embedding_field: str = "__embedding",
-    backend: Literal["auto", "cpu", "gpu", "openai"] = "auto",
+    model: Literal["gte-small", "gte-tiny", None] = "gte-tiny",
+    backend: Literal["cpu", "gpu", "openai", "replicate", "modal"] = "cpu",
+    normalize: bool = False,
+    pad: bool = False,
+    split_strategy: Literal["truncate", "greedy", "even"] = "even",
 ):
     """
     Get embeddings for a field in the dataset.
+    :param input_field: The field to get embeddings for.
+    :type input_field: str
+    :param embedding_field: The field to store the embeddings in.
+    :type embedding_field: str, default='__embedding'
+    :param model: The model to use for embeddings, if computing locally. Options: 'gte-small', 'gte-tiny', 'bge-micro'.
 
     .. code-block:: python
 
@@ -248,66 +94,44 @@ def get_embeddings(
         ds.get_embeddings(field="field_name1")
 
     """
-    self.initialize_embedding_model(backend=backend)
-
     # make sure the field doesn't exist already
     if embedding_field in self.dataset.column_names:
         raise ValueError(
             f"Field {embedding_field} already exists in dataset. Please choose a different name, or drop the column."
         )
 
-    if backend == "auto":
-        backend = "cpu"
-    if backend == "openai":
-        requests_left = {"n": len(self.dataset)}
+    self.initialize_embedding_model(model=model, backend=backend)
 
-        def _embed_batch(batch):
-            start_time = time.time()
-            embs = embed_texts_with_openai(
-                batch[input_field], self.openai_api_key, show_progress=False
-            )
-            requests_left["n"] -= len(batch[input_field])
-            logger.info(f"Requests left: {requests_left['n']}")
-            end_time = time.time()
-            # if it took less than 1m, cool down to avoid rate limits
-            if end_time - start_time < 60 and requests_left["n"] > 0:
-                time.sleep(60 - (end_time - start_time))
-            return {embedding_field: embs}
-
+    # if onnx, don't batch, it doesn't help
+    if backend in ["cpu", "onnx", "gpu"]:
         self.dataset = self.dataset.map(
-            _embed_batch,
-            batched=True,
-            batch_size=self.max_requests_per_minute,
+            lambda x: {
+                embedding_field: self.model.embed(
+                    x[input_field],
+                    normalize=normalize,
+                    pad=pad,
+                    split_strategy=split_strategy,
+                ).tolist()
+            }
         )
-    elif backend == "replicate":
-        if not hasattr(self, "replicate_api_key"):
-            raise ValueError(
-                "You must set replicate_api_key before calling get_embeddings() with replicate backend."
+    # if openai, do one big batch and let our throttling handle rate limits
+    elif backend == "openai":
+        if normalize:
+            logger.info("OpenAI embeddings are normalized by default.")
+        else:
+            logger.warning(
+                "OpenAI embeddings are normalized by default, so normalize=False has no effect."
             )
-        texts = self.dataset[input_field]
-        embs = embed_texts_with_replicate(
-            texts=texts,
-            api_key=self.replicate_api_key,
-            batch_size=100,
+        embs = self.model.embed_batch(
+            self.dataset[input_field], normalize=normalize
         )
         self.dataset = self.dataset.add_column(embedding_field, embs)
-    elif backend == "modal":
 
-        def _embed_batch(batch):
-            texts = batch[input_field]
-            promises = self.modal_fn.map(
-                [texts[i : i + 10] for i in range(0, len(texts), 10)]
-            )
-            results = [p for p in promises]
-            flattened = [item for sublist in results for item in sublist]
-            return {embedding_field: flattened}
-
+    else:
         self.dataset = self.dataset.map(
-            _embed_batch, batched=True, batch_size=2000
-        )
-    elif backend == "cpu":
-        self.dataset = self.dataset.map(
-            lambda x: {embedding_field: self.model(x[input_field])}
+            lambda x: self.model.embed_batch(x[input_field]),
+            batched=True,
+            batch_size=1000,
         )
     logger.info(
         f"Created embeddings on field '{input_field}', stored in '{embedding_field}'."

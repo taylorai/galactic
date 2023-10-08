@@ -47,6 +47,8 @@ class APIRequest:
         self.url = EMBEDDING_URL if self.type == "embedding" else CHAT_URL
         self.request_json = {}
 
+        # you could save on API requests by doing > 1 text per request,
+        # but we're usually hitting the token limit first anyway
         if self.type == "embedding":
             if self.logit_bias is not None or self.max_new_tokens is not None:
                 raise NotImplementedError(

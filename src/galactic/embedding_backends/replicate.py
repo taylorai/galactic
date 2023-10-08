@@ -2,7 +2,6 @@
 ### NOT CURRENTLY USED IN PRODUCTION, here for reference & possible future use for embeddings backend.
 ### Code here adapted from openai cookbook: https://github.com/openai/openai-cookbook/blob/main/examples/api_request_parallel_processor.py
 import aiohttp
-import numpy as np
 import asyncio
 import json
 import logging
@@ -10,15 +9,46 @@ import time
 import random
 from tqdm.auto import tqdm
 from dataclasses import dataclass, field
-from typing import Optional
 from itertools import islice
+from .base import EmbeddingModelBase
 
 logger = logging.getLogger("galactic")
 
-EMBEDDING_URL = "https://api.replicate.com/v1/predictions"
-API_VERSION = (
-    "3358c35efbe0c1ca88f6ed77dcd9d306fff9ddf0341f51747ea10ee494ddd682"
-)
+
+class ReplicateEmbeddingModel(EmbeddingModelBase):
+    def __init__(
+        self,
+        replicate_api_key: str,
+        embedding_url="https://api.replicate.ai/v1/predictions",
+        api_version="3358c35efbe0c1ca88f6ed77dcd9d306fff9ddf0341f51747ea10ee494ddd682",
+        max_requests_per_minute: int = 3000,
+    ):
+        super().__init__()
+        self.replicate_api_key = replicate_api_key
+        self.embedding_url = embedding_url
+        self.api_version = api_version
+        self.max_requests_per_minute = max_requests_per_minute
+
+    # should probably just do this with onnx for a single embedding??
+    def embed(self, text: str):
+        emb = embed_texts_with_replicate(
+            texts=[text],
+            api_key=self.replicate_api_key,
+            url=self.embedding_url,
+            api_version=self.api_version,
+            max_requests_per_minute=self.max_requests_per_minute,
+        )[0]
+        return emb
+
+    def embed_batch(self, texts: list[str]):
+        embs = embed_texts_with_replicate(
+            texts=texts,
+            api_key=self.replicate_api_key,
+            url=self.embedding_url,
+            api_version=self.api_version,
+            max_requests_per_minute=self.max_requests_per_minute,
+        )
+        return embs
 
 
 @dataclass
@@ -37,13 +67,14 @@ class APIRequest:
     task_id: int
     texts: list[str]
     attempts_left: int
+    url: str
+    api_version: str
     result: list = field(default_factory=list)
 
     def __post_init__(self):
         # get the URL and request JSON
-        self.url = EMBEDDING_URL
         self.request_json = {
-            "version": API_VERSION,
+            "version": self.api_version,
             "input": {
                 "texts": json.dumps(self.texts),
             },
@@ -138,6 +169,8 @@ async def process_api_requests_from_list(
     texts: list[list[str]],
     api_key: str,
     max_attempts: int,
+    url: str,
+    api_version: str,
     max_requests_per_minute: int = 3000,
 ):
     """Processes API requests in parallel, throttling to stay under rate limits."""
@@ -185,6 +218,8 @@ async def process_api_requests_from_list(
                         task_id=idx,
                         texts=text_batch,
                         attempts_left=max_attempts,
+                        url=url,
+                        api_version=api_version,
                     )
                     status_tracker.num_tasks_started += 1
                     status_tracker.num_tasks_in_progress += 1
@@ -278,8 +313,10 @@ def batchify(data, batch_size):
 def embed_texts_with_replicate(
     texts: list[str],
     api_key: str,
-    batch_size: int = 100,
-    max_attempts: int = 10,
+    url: str,
+    api_version: str,
+    batch_size: int = 25,
+    max_attempts: int = 3,
     max_requests_per_minute: int = 3000,
 ):
     results = asyncio.run(
@@ -288,6 +325,8 @@ def embed_texts_with_replicate(
             api_key=api_key,
             max_attempts=max_attempts,
             max_requests_per_minute=max_requests_per_minute,
+            url=url,
+            api_version=api_version,
         )
     )
     # extract the embeddings
