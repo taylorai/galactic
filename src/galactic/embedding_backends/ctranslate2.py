@@ -137,6 +137,7 @@ class CT2EmbeddingModel(EmbeddingModelBase):
             texts, pad=False, split_strategy=split_strategy
         )
         outputs = None
+        print(inputs)
         for i in range(0, len(inputs["input_ids"]), self.batch_size):
             batch = inputs["input_ids"][i : i + self.batch_size]
             batch_out = self.model.forward_batch(batch).pooler_output
