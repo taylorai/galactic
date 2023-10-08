@@ -74,6 +74,7 @@ class CT2EmbeddingModel(EmbeddingModelBase):
         while current_batch_size > 0:
             try:
                 self.model.forward_batch(sample_batch)
+                logger.info(f"Batch size selected: {current_batch_size}")
                 return current_batch_size
             except Exception as e:
                 if "out of memory" in str(e):
@@ -120,7 +121,46 @@ class CT2EmbeddingModel(EmbeddingModelBase):
 
         return output
 
-    def embed_batch(self, texts: list[str], normalize: bool = False):
-        raise NotImplementedError(
-            "CTranslate2 does not support batching yet. Use a different backend."
+    def embed_batch(
+        self,
+        texts: list[str],
+        normalize: bool = False,
+        pad: bool = False,
+        split_strategy: Literal["truncate", "greedy", "even"] = "even",
+    ):
+        if pad:
+            logger.warning(
+                "Padding is not necessary for CTranslate2. Ignoring pad=True."
+            )
+
+        inputs, offsets = self.split_and_tokenize_batch(
+            texts, pad=False, split_strategy=split_strategy
         )
+        outputs = None
+        for i in range(0, len(inputs["input_ids"]), self.batch_size):
+            batch = inputs["input_ids"][i : i + self.batch_size]
+            batch_out = self.model.forward_batch(batch).pooler_output
+            if self.device == "cuda":
+                batch_out = (
+                    torch.as_tensor(batch_out, device="cuda")
+                    .cpu()
+                    .numpy()  # batch_size, hidden_size
+                )
+            else:
+                batch_out = np.array(batch_out)  # batch_size, hidden_size
+            if outputs is None:
+                outputs = batch_out
+            else:
+                outputs = np.concatenate([outputs, batch_out], axis=0)
+
+        # use offsets to average each text's embeddings
+        embs = []
+        for i in range(len(offsets) - 1):
+            start, end = offsets[i], offsets[i + 1]
+            chunk = outputs[start:end]
+            averaged = chunk.mean(axis=0)
+            if normalize:
+                averaged = averaged / np.linalg.norm(averaged)
+            embs.append(averaged)
+
+        return np.array(embs)

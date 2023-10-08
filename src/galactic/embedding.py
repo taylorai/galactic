@@ -103,7 +103,7 @@ def get_embeddings(
     self.initialize_embedding_model(model=model, backend=backend)
 
     # if onnx, don't batch, it doesn't help
-    if backend in ["cpu", "onnx", "gpu"]:
+    if backend in ["cpu", "onnx"]:
         self.dataset = self.dataset.map(
             lambda x: {
                 embedding_field: self.model.embed(

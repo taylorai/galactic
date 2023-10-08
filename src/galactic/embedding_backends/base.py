@@ -75,11 +75,22 @@ class EmbeddingModelBase(ABC):
 
         # pad if applicable
         if pad:
+            # first make sure list is nested
+            if not isinstance(tokenized["input_ids"][0], list):
+                for k in tokenized:
+                    tokenized[k] = [tokenized[k]]
+
+            # get pad token
             pad_token_id = self.tokenizer.pad_token_id
             if pad_token_id is None:
                 pad_token_id = 0
 
-            pad_len = max([len(tokenized[k][0]) for k in tokenized])
+            pad_len = max(
+                [
+                    len(tokenized["input_ids"][i])
+                    for i in range(len(tokenized["input_ids"]))
+                ]
+            )
             for k in tokenized:
                 tokenized[k] = [
                     np.pad(
@@ -93,10 +104,13 @@ class EmbeddingModelBase(ABC):
         return tokenized
 
     def split_and_tokenize_batch(
-        self, texts: list[str]
-    ) -> Tuple[dict[str, np.ndarray], list[int]]:
+        self,
+        texts: str,
+        pad: bool = False,
+        split_strategy: Literal["truncate", "greedy", "even"] = "even",
+    ) -> dict:
         """
-        Tokenize the text and pad it to be a multiple of max_length.
+        Tokenize the text and pad if applicable.
 
         :param text: The input text to be tokenized.
         :type text: str
@@ -110,53 +124,47 @@ class EmbeddingModelBase(ABC):
 
             tokenized_text = model.split_and_tokenize('sample text')
         """
-        raise NotImplementedError
         result = {}
-        offsets = []
+        offsets = [0]
         if self.tokenizer is None:
             raise ValueError("Tokenizer is not initialized.")
         if self.max_length is None:
             raise ValueError("max_length is not initialized.")
 
+        # first tokenize without padding
         for text in texts:
-            # first make into tokens
-            tokenized = self.tokenizer(text, return_tensors="np")
-
-            # pad to be a multiple of max_length
-            pad_token_id = self.tokenizer.pad_token_id
-            if pad_token_id is None:
-                pad_token_id = 0
-
-            rounded_len = int(
-                np.ceil(len(tokenized["input_ids"][0]) / self.max_length)
-                * self.max_length
+            tokenized = self.split_and_tokenize_single(
+                text, pad=False, split_strategy=split_strategy
             )
-            for k in tokenized:
-                tokenized[k] = np.pad(
-                    tokenized[k],
-                    ((0, 0), (0, rounded_len - len(tokenized[k][0]))),
-                    constant_values=pad_token_id,
-                )
-
-            # reshape into batch with max length
-            for k in tokenized:
-                tokenized[k] = tokenized[k].reshape((-1, self.max_length))
-
-            num_chunks = tokenized["input_ids"].shape[0]
-            if len(offsets) == 0:
-                offsets.append(num_chunks)
-            else:
-                offsets.append(num_chunks + offsets[-1])
-
             for k in tokenized:
                 if k not in result:
                     result[k] = tokenized[k]
                 else:
-                    result[k] = np.concatenate(
-                        (result[k], tokenized[k]), axis=0
-                    )
+                    result[k].extend(tokenized[k])
 
-        return tokenized
+            offsets.append(len(result["input_ids"]))
+
+        # then, if padding, use longest length in batch
+        if pad:
+            pad_token_id = self.tokenizer.pad_token_id
+            if pad_token_id is None:
+                pad_token_id = 0
+
+            pad_len = max([len(tokenized[k][0]) for k in result])
+            for k in result:
+                result[k] = [
+                    np.pad(
+                        result[k][i],
+                        (0, pad_len - len(result[k][i])),
+                        constant_values=pad_token_id,
+                    ).tolist()
+                    for i in range(len(result[k]))
+                ]
+
+        return {
+            "tokens": result,
+            "offsets": offsets,
+        }
 
     @abstractmethod
     def embed(
