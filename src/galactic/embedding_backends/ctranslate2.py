@@ -133,10 +133,11 @@ class CT2EmbeddingModel(EmbeddingModelBase):
                 "Padding is not necessary for CTranslate2. Ignoring pad=True."
             )
 
-        inputs, offsets = self.split_and_tokenize_batch(
+        tokenized = self.split_and_tokenize_batch(
             texts, pad=False, split_strategy=split_strategy
         )
-        outputs = None
+        inputs = tokenized["tokens"]
+        offsets = tokenized["offsets"]
         print(inputs)
         for i in range(0, len(inputs["input_ids"]), self.batch_size):
             batch = inputs["input_ids"][i : i + self.batch_size]
