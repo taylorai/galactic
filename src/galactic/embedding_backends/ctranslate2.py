@@ -138,7 +138,7 @@ class CT2EmbeddingModel(EmbeddingModelBase):
         )
         inputs = tokenized["tokens"]
         offsets = tokenized["offsets"]
-        print(inputs)
+        outputs = None
         for i in range(0, len(inputs["input_ids"]), self.batch_size):
             batch = inputs["input_ids"][i : i + self.batch_size]
             batch_out = self.model.forward_batch(batch).pooler_output
