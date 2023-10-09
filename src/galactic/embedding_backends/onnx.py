@@ -47,6 +47,11 @@ class ONNXEmbeddingModel(EmbeddingModelBase):
         if "CUDAExecutionProvider" in ort.get_available_providers():
             logger.info("Using CUDAExecutionProvider since it is available.")
             self.providers = ["CUDAExecutionProvider"]
+            if "TensorrtExecutionProvider" in ort.get_available_providers():
+                logger.info(
+                    "Using TensorrtExecutionProvider since it is available."
+                )
+                self.providers.append("TensorrtExecutionProvider")
         self.session = ort.InferenceSession(
             local_path, providers=self.providers
         )
