@@ -40,14 +40,16 @@ class ONNXEmbeddingModel(EmbeddingModelBase):
             model_registry[model_name]["tokenizer"]
         )
         self.max_length = max_length
-        providers = ["CPUExecutionProvider"]
+        self.providers = ["CPUExecutionProvider"]
         # this only matters if using onnxruntime-silicon which didn't do anything for me
         if "CoreMLExecutionProvider" in ort.get_available_providers():
-            providers.append("CoreMLExecutionProvider")
+            self.providers.append("CoreMLExecutionProvider")
         if "CUDAExecutionProvider" in ort.get_available_providers():
             logger.info("Using CUDAExecutionProvider since it is available.")
-            providers.append("CUDAExecutionProvider")
-        self.session = ort.InferenceSession(local_path, providers=providers)
+            self.providers = ["CUDAExecutionProvider"]
+        self.session = ort.InferenceSession(
+            local_path, providers=self.providers
+        )
 
     def embed(
         self,
