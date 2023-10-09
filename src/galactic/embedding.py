@@ -129,9 +129,11 @@ def get_embeddings(
 
     else:
         self.dataset = self.dataset.map(
-            lambda x: self.model.embed_batch(x[input_field]),
+            lambda x: {
+                embedding_field: self.model.embed_batch(x[input_field])
+            },
             batched=True,
-            batch_size=1000,
+            batch_size=4096,
         )
     logger.info(
         f"Created embeddings on field '{input_field}', stored in '{embedding_field}'."
