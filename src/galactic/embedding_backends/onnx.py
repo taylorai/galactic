@@ -5,6 +5,10 @@ from huggingface_hub import hf_hub_download
 import numpy as np
 from typing import Literal
 
+import logging
+
+logger = logging.getLogger("galactic")
+
 model_registry = {
     "gte-small": {
         "remote_file": "model_quantized.onnx",
@@ -40,6 +44,9 @@ class ONNXEmbeddingModel(EmbeddingModelBase):
         # this only matters if using onnxruntime-silicon which didn't do anything for me
         if "CoreMLExecutionProvider" in ort.get_available_providers():
             providers.append("CoreMLExecutionProvider")
+        if "CUDAExecutionProvider" in ort.get_available_providers():
+            logger.info("Using CUDAExecutionProvider since it is available.")
+            providers.append("CUDAExecutionProvider")
         self.session = ort.InferenceSession(local_path, providers=providers)
 
     def embed(
