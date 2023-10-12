@@ -1,17 +1,10 @@
-from transformers import AutoTokenizer
 from typing import Optional
 import numpy as np
-import pandas as pd
-from huggingface_hub import hf_hub_download
 from typing import Union, Literal
-import openai
-import tiktoken
-from .async_openai import embed_texts_with_openai
-from .embedding_backends.replicate import ReplicateEmbeddingModel
-from .embedding_backends.onnx import ONNXEmbeddingModel
-from .embedding_backends.ctranslate2 import CT2EmbeddingModel
-from .embedding_backends.openai import OpenAIEmbeddingModel
-import time
+from .embedding_backends.replicate_backend import ReplicateEmbeddingModel
+from .embedding_backends.onnx_backend import ONNXEmbeddingModel
+from .embedding_backends.ctranslate2_backend import CT2EmbeddingModel
+from .embedding_backends.openai_backend import OpenAIEmbeddingModel
 import logging
 
 logger = logging.getLogger("galactic")
@@ -41,7 +34,7 @@ def initialize_embedding_model(
     """
     if backend in ["cpu", "onnx"]:
         self.model = ONNXEmbeddingModel(model_name=model)
-    elif backend == "gpu":
+    elif backend in ["gpu", "ctranslate2"]:
         self.model = CT2EmbeddingModel(model_name=model)
 
     elif backend == "openai":
@@ -61,11 +54,9 @@ def initialize_embedding_model(
             replicate_api_key=self.replicate_api_key
         )
     elif backend == "modal":
-        # import modal
+        from .embedding_backends.modal_backend import ModalEmbeddingModel
 
-        # self.modal_fn = modal.Function.lookup("gte_small", "GTE.forward")
-        # self.model = lambda x: self.modal_fn.remote(x)[0]
-        raise NotImplementedError("not quite yet, bucko")
+        self.model = ModalEmbeddingModel(model_name=model)
     else:
         raise ValueError(f"Unknown backend: {backend}")
 
@@ -75,7 +66,9 @@ def get_embeddings(
     input_field: str,
     embedding_field: str = "__embedding",
     model: Literal["gte-small", "gte-tiny", None] = "gte-tiny",
-    backend: Literal["cpu", "gpu", "openai", "replicate", "modal"] = "cpu",
+    backend: Literal[
+        "cpu", "gpu", "openai", "replicate", "modal", "onnx", "ctranslate2"
+    ] = "cpu",
     normalize: bool = False,
     pad: bool = False,
     split_strategy: Literal["truncate", "greedy", "even"] = "even",
@@ -126,7 +119,6 @@ def get_embeddings(
             self.dataset[input_field], normalize=normalize
         )
         self.dataset = self.dataset.add_column(embedding_field, embs)
-
     else:
         self.dataset = self.dataset.map(
             lambda x: {

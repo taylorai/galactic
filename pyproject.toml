@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 
 [project]
 name = "galactic-ai"
-version="0.2.10"
+version="0.2.15"
 authors = [
     {name = "Benjamin Anderson", email = "ben@trytaylor.ai"},
 ]
@@ -47,7 +47,8 @@ dependencies = [
     "boilerpy3",
     "goose3",
     "selenium",
-    "webdriver-manager"
+    "webdriver-manager",
+    "torch"
 ]
 
 [tool.black]

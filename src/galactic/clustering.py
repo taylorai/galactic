@@ -108,7 +108,8 @@ def cluster(
         self.cluster_ids[cluster_field] = list(set(labels))
         # cluster centers is a dict of id -> center
         self.cluster_centers[cluster_field] = {
-            i: model.cluster_centers_[i] for i in range(max(self.cluster_ids))
+            i: model.cluster_centers_[i]
+            for i in range(max(self.cluster_ids[cluster_field]))
         }
         self.dataset = self.dataset.add_column(cluster_field, labels)
 

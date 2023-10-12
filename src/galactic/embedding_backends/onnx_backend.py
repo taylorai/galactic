@@ -9,49 +9,50 @@ import logging
 
 logger = logging.getLogger("galactic")
 
-model_registry = {
-    "gte-small": {
-        "remote_file": "model_quantized.onnx",
-        "tokenizer": "Supabase/gte-small",
-    },
-    "gte-tiny": {
-        "remote_file": "gte-tiny.onnx",
-        "tokenizer": "Supabase/gte-small",
-    },
-    "bge-micro": {
-        "remote_file": "bge-micro.onnx",
-        "tokenizer": "BAAI/bge-small-en-v1.5",
-    },
-}
-
 
 class ONNXEmbeddingModel(EmbeddingModelBase):
     def __init__(
         self,
         model_name: str = "bge-micro",
         max_length: int = 512,
+        local_path=None,
     ):
         super().__init__()
-        local_path = hf_hub_download(
-            "TaylorAI/galactic-models",
-            filename=model_registry[model_name]["remote_file"],
-        )
+        self.model_registry = {
+            "gte-small": {
+                "remote_file": "model_quantized.onnx",
+                "tokenizer": "Supabase/gte-small",
+            },
+            "gte-tiny": {
+                "remote_file": "gte-tiny.onnx",
+                "tokenizer": "Supabase/gte-small",
+            },
+            "bge-micro": {
+                "remote_file": "bge-micro.onnx",
+                "tokenizer": "BAAI/bge-small-en-v1.5",
+            },
+        }
+        if local_path is None:
+            local_path = hf_hub_download(
+                "TaylorAI/galactic-models",
+                filename=self.model_registry[model_name]["remote_file"],
+            )
         self.tokenizer = AutoTokenizer.from_pretrained(
-            model_registry[model_name]["tokenizer"]
+            self.model_registry[model_name]["tokenizer"]
         )
         self.max_length = max_length
         self.providers = ["CPUExecutionProvider"]
-        # this only matters if using onnxruntime-silicon which didn't do anything for me
-        if "CoreMLExecutionProvider" in ort.get_available_providers():
-            self.providers.append("CoreMLExecutionProvider")
-        if "CUDAExecutionProvider" in ort.get_available_providers():
-            logger.info("Using CUDAExecutionProvider since it is available.")
-            self.providers = ["CUDAExecutionProvider"]
-            if "TensorrtExecutionProvider" in ort.get_available_providers():
-                logger.info(
-                    "Using TensorrtExecutionProvider since it is available."
-                )
-                self.providers.append("TensorrtExecutionProvider")
+        # # this only matters if using onnxruntime-silicon which didn't do anything for me
+        # if "CoreMLExecutionProvider" in ort.get_available_providers():
+        #     self.providers.append("CoreMLExecutionProvider")
+        # if "CUDAExecutionProvider" in ort.get_available_providers():
+        #     logger.info("Using CUDAExecutionProvider since it is available.")
+        #     self.providers = ["CUDAExecutionProvider"]
+        #     if "TensorrtExecutionProvider" in ort.get_available_providers():
+        #         logger.info(
+        #             "Using TensorrtExecutionProvider since it is available."
+        #         )
+        #         self.providers.append("TensorrtExecutionProvider")
         self.session = ort.InferenceSession(
             local_path, providers=self.providers
         )
@@ -93,10 +94,21 @@ class ONNXEmbeddingModel(EmbeddingModelBase):
         return avg
 
     def embed_batch(
-        self, texts: list[str], normalize: bool = False, pad: bool = False
+        self,
+        texts: list[str],
+        normalize: bool = False,
+        pad: bool = False,
+        split_strategy: Literal["truncate", "greedy", "even"] = "even",
     ):
         result = []
         for text in texts:
-            result.append(self.embed(text, normalize=normalize, pad=pad))
+            result.append(
+                self.embed(
+                    text,
+                    normalize=normalize,
+                    pad=pad,
+                    split_strategy=split_strategy,
+                )
+            )
 
         return np.array(result)
