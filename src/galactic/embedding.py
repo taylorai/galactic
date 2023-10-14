@@ -15,7 +15,9 @@ def initialize_embedding_model(
     backend: Literal[
         "cpu", "onnx", "gpu", "openai", "replicate", "modal"
     ] = "cpu",
-    model: Literal["gte-small", "gte-tiny", None] = "gte-tiny",
+    model: Literal[
+        "gte-small", "gte-tiny", "bge-micro", "bge-micro-v2", None
+    ] = "bge-micro",
     max_requests_per_minute: Optional[int] = None,
     max_tokens_per_minute: Optional[int] = None,
 ):
@@ -65,7 +67,9 @@ def get_embeddings(
     self,
     input_field: str,
     embedding_field: str = "__embedding",
-    model: Literal["gte-small", "gte-tiny", None] = "gte-tiny",
+    model: Literal[
+        "gte-small", "gte-tiny", "bge-micro", "bge-micro-v2", None
+    ] = "bge-micro",
     backend: Literal[
         "cpu", "gpu", "openai", "replicate", "modal", "onnx", "ctranslate2"
     ] = "cpu",

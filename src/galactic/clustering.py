@@ -17,9 +17,7 @@ logger = logging.getLogger("galactic")
 def cluster(
     self,
     n_clusters: Optional[int] = None,
-    method: Literal[
-        "kmeans", "minibatch_kmeans", "bisecting_kmeans", "hdbscan"
-    ] = "kmeans",
+    method: Literal["kmeans", "minibatch_kmeans", "hdbscan"] = "kmeans",
     embedding_field: str = "__embedding",
     cluster_field: str = "__cluster",
     overwrite: bool = False,
@@ -80,8 +78,15 @@ def cluster(
         )
         for epoch in range(kwargs.get("n_epochs", 5)):
             logger.info(f"Epoch {epoch+1}/{kwargs.get('n_epochs', 5)}")
-            self.dataset.map(
-                lambda x: model.partial_fit(np.array(x[embedding_field])),
+            self.dataset.shuffle(seed=epoch).map(
+                lambda x: (
+                    model.partial_fit(np.array(x[embedding_field])),
+                    None,
+                )[
+                    1
+                ],  # hack to return None
+                batched=True,
+                batch_size=kwargs.get("batch_size", 1024),
             )
         self.dataset = self.dataset.map(
             lambda batch: {
@@ -93,23 +98,24 @@ def cluster(
             batch_size=kwargs.get("batch_size", 1024),
         )
 
-    elif method in ["kmeans", "bisecting_kmeans"]:
+    elif method in [
+        "kmeans"
+    ]:  # , "bisecting_kmeans"]: -- removed for now because it's buggy
         if method == "kmeans":
             model = KMeans(n_clusters=n_clusters, init="k-means++", n_init=1)
-        elif method == "bisecting_kmeans":
-            model = BisectingKMeans(
-                n_clusters=n_clusters,
-                init="k-means++",
-                n_init=1,
-                bisecting_strategy="largest_cluster",
-            )
+        # elif method == "bisecting_kmeans":
+        #     model = BisectingKMeans(
+        #         n_clusters=n_clusters,
+        #         init="random",
+        #         n_init=10,
+        #         bisecting_strategy="largest_cluster",
+        #     )
         arr = np.array(self.dataset[embedding_field])
         labels = model.fit_predict(arr)
         self.cluster_ids[cluster_field] = list(set(labels))
         # cluster centers is a dict of id -> center
         self.cluster_centers[cluster_field] = {
-            i: model.cluster_centers_[i]
-            for i in range(max(self.cluster_ids[cluster_field]))
+            i: model.cluster_centers_[i] for i in range(n_clusters)
         }
         self.dataset = self.dataset.add_column(cluster_field, labels)
 
@@ -130,7 +136,7 @@ def cluster(
         self.cluster_ids[cluster_field] = list(set(labels))
         # cluster centers is a dict of id -> center
         self.cluster_centers[cluster_field] = {
-            i: model.medoids_[i] for i in range(max(self.cluster_ids))
+            i: model.medoids_[i] for i in range(len(max(labels) + 1))
         }
         self.dataset = self.dataset.add_column(cluster_field, labels)
     else:

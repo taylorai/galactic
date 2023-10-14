@@ -216,3 +216,19 @@ def save(self, path: str, overwrite: bool = False) -> None:
     elif ext == "jsonl":
         df = self.dataset.to_pandas()
         df.to_json(path, orient="records", lines=True)
+
+
+# output to pandas
+def to_pandas(self) -> pd.DataFrame:
+    """
+    Converts the dataset to a Pandas DataFrame.
+
+    .. code-block:: python
+
+        # Example usage:
+        df = ds.to_pandas()
+
+    :return: A Pandas DataFrame containing the dataset.
+    :rtype: pd.DataFrame
+    """
+    return self.dataset.to_pandas()

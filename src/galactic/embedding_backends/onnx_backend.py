@@ -31,6 +31,10 @@ class ONNXEmbeddingModel(EmbeddingModelBase):
                 "remote_file": "bge-micro.onnx",
                 "tokenizer": "BAAI/bge-small-en-v1.5",
             },
+            "bge-micro-v2": {
+                "remote_file": "bge-micro-v2.onnx",
+                "tokenizer": "BAAI/bge-small-en-v1.5",
+            },
         }
         if local_path is None:
             local_path = hf_hub_download(

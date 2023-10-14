@@ -51,6 +51,7 @@ class GalacticDataset(GalacticDatasetBase):
     from_hugging_face = classmethod(loaders.from_hugging_face)
     from_hugging_face_stream = classmethod(loaders.from_hugging_face_stream)
     save = loaders.save
+    to_pandas = loaders.to_pandas
     ## conversation utils
     conversation_from_dicts = conversations.conversation_from_dicts
     conversation_from_string = conversations.conversation_from_string

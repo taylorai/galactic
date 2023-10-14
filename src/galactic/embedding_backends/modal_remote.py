@@ -1,4 +1,4 @@
-# if you want to use Modal Labs for embeddings, you'll need to deploy this in YOUR modal account under the name 'gte_small'.
+# if you want to use Modal Labs for embeddings, you'll need to deploy this in YOUR modal account under the name 'modal_embeddings'.
 # then, if you're authenticated to Modal, you should be able to look up the function and use it as an embeddings backend.
 from modal import Image, Stub, method, Cls
 from typing import Union, Literal
@@ -36,6 +36,10 @@ class RemoteEmbeddingModel:
             },
             "bge-micro": {
                 "remote_file": "bge-micro.onnx",
+                "tokenizer": "BAAI/bge-small-en-v1.5",
+            },
+            "bge-micro-v2": {
+                "remote_file": "bge-micro-v2.onnx",
                 "tokenizer": "BAAI/bge-small-en-v1.5",
             },
         }

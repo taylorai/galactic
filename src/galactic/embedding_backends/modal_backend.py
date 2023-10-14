@@ -1,5 +1,3 @@
-# if you want to use Modal Labs for embeddings, you'll need to deploy this in YOUR modal account under the name 'gte_small'.
-# then, if you're authenticated to Modal, you should be able to look up the function and use it as an embeddings backend.
 import numpy as np
 from modal import Cls
 from typing import Union, Literal
