@@ -84,9 +84,7 @@ class ONNXEmbeddingModel(EmbeddingModelBase):
                     "attention_mask": input["attention_mask"][seq : seq + 1],
                     "token_type_ids": input["token_type_ids"][seq : seq + 1],
                 },
-            )[
-                0
-            ]  # 1, seq_len, hidden_size
+            )[0]  # 1, seq_len, hidden_size
             trimmed = out[
                 0, np.array(input["attention_mask"][seq]) == 1, :
             ]  # chunk_seq_len, hidden_size
