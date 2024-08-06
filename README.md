@@ -26,7 +26,7 @@
 
 ## IMPORTANT UPDATE: REMOVED FROM PYPI
 
-Due to a trademark dispute, and because this project is no longer actively maintained, we made the decision to remove the associated package from PyPI, where it was previously available as `galactic-ai`. You can still install it from source:
+Due to a trademark dispute related to the name "Galactic AI", and because this project is no longer actively maintained, we made the decision to remove the associated package from PyPI, where it was previously available as `galactic-ai`. This project is not associated with any commercial product called "Galactic" or "Galactic AI". It is an archived open-source project with no planned future updates. You can still install it from source:
 
 ```
 pip install git+https://github.com/taylorai/galactic.git
